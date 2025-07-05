@@ -235,7 +235,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       setMessages(() => {
         console.log('👇all_messages', data.messages)
-        return data.messages
+        // 确保 messages 是数组
+        return Array.isArray(data.messages) ? data.messages : []
       })
       scrollToBottom()
     },
@@ -429,6 +430,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                   {message.role === 'assistant' &&
                     message.tool_calls &&
+                    Array.isArray(message.tool_calls) &&
                     message.tool_calls.at(-1)?.function.name != 'finish' &&
                     message.tool_calls.map((toolCall, i) => {
                       return (

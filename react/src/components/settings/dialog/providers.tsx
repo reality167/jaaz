@@ -12,6 +12,7 @@ import { Plus, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import LiblibaiSetting from '../LiblibaiSetting'
 
 const SettingProviders = () => {
   const { t } = useTranslation()
@@ -129,6 +130,11 @@ const SettingProviders = () => {
           <div key={key} className="w-full">
             {key === 'comfyui' ? (
               <ComfyuiSetting
+                config={providers[key]}
+                onConfigChange={handleConfigChange}
+              />
+            ) : key === 'liblibai' ? (
+              <LiblibaiSetting
                 config={providers[key]}
                 onConfigChange={handleConfigChange}
               />

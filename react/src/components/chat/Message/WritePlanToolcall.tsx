@@ -13,8 +13,14 @@ export default function WritePlanToolCall({ args }: { args: string }) {
   } | null = null
 
   try {
-    parsedArgs = JSON.parse(args)
-  } catch (error) {}
+    const parsed = JSON.parse(args)
+    // 确保解析的数据结构正确
+    if (parsed && parsed.steps && Array.isArray(parsed.steps)) {
+      parsedArgs = parsed
+    }
+  } catch (error) {
+    console.error('Failed to parse WritePlan args:', error)
+  }
 
   return (
     <div className="bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 rounded-md shadow-sm overflow-hidden mb-4">

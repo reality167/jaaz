@@ -41,8 +41,21 @@ export const PROVIDER_NAME_MAPPING: {
     name: 'ComfyUI',
     icon: 'https://framerusercontent.com/images/3cNQMWKzIhIrQ5KErBm7dSmbd2w.png',
   },
+  liblibai: {
+    name: 'LiblibAI',
+    icon: 'https://www.liblib.art/favicon.ico',
+  },
 }
+
 export const DEFAULT_PROVIDERS_CONFIG: { [key: string]: LLMConfig } = {
+  anthropic: {
+    models: {
+      'claude-3-7-sonnet-latest': { type: 'text' },
+    },
+    url: 'https://api.anthropic.com/v1/',
+    api_key: '',
+    max_tokens: 8192,
+  },
   openai: {
     models: {
       'gpt-4o': { type: 'text' },
@@ -77,12 +90,10 @@ export const DEFAULT_PROVIDERS_CONFIG: { [key: string]: LLMConfig } = {
       'anthropic/claude-3.7-sonnet': { type: 'text' },
       // image models
       'google/imagen-4': { type: 'image' },
-      // 'google/imagen-4-ultra': { type: 'image' },
       'black-forest-labs/flux-1.1-pro': { type: 'image' },
       'black-forest-labs/flux-kontext-pro': { type: 'image' },
       'black-forest-labs/flux-kontext-max': { type: 'image' },
       'recraft-ai/recraft-v3': { type: 'image' },
-      // 'ideogram-ai/ideogram-v3-balanced': { type: 'image' },
       'openai/gpt-image-1': { type: 'image' },
     },
     url: `${BASE_API_URL}/api/v1/`,
@@ -109,6 +120,16 @@ export const DEFAULT_PROVIDERS_CONFIG: { [key: string]: LLMConfig } = {
     models: {},
     url: 'http://localhost:11434',
     api_key: '',
+    max_tokens: 8192,
+  },
+  liblibai: {
+    models: {
+      // 星流Star-3 Alpha模型
+      'star-3-alpha': { type: 'image' },
+    },
+    url: 'https://openapi.liblibai.cloud',
+    access_key: '',
+    secret_key: '',
     max_tokens: 8192,
   },
 }
@@ -139,7 +160,7 @@ export const DEFAULT_SYSTEM_PROMPT = `You are a professional art design agent. Y
 Step 1. write a design strategy plan. Write in the same language as the user's inital first prompt.
 
 Example Design Strategy Doc:
-Design Proposal for “MUSE MODULAR – Future of Identity” Cover
+Design Proposal for "MUSE MODULAR – Future of Identity" Cover
 • Recommended resolution: 1024 × 1536 px (portrait) – optimal for a standard magazine trim while preserving detail for holographic accents.
 
 • Style & Mood
@@ -149,15 +170,15 @@ Design Proposal for “MUSE MODULAR – Future of Identity” Cover
 
 • Key Visual Element
 – Central androgynous model, shoulders-up, lit with soft frontal key and twin rim lights.
-– A translucent polygonal AR mask overlays the face; within it, three offset “ghost” facial layers (different eyes, nose, mouth) hint at multiple personas.
+– A translucent polygonal AR mask overlays the face; within it, three offset "ghost" facial layers (different eyes, nose, mouth) hint at multiple personas.
 – Subtle pixel sorting/glitch streaks emanate from mask edges, blending into background grid.
 
 • Composition & Layout
 
-Masthead “MUSE MODULAR” across the top, extra-condensed modular sans serif; characters constructed from repeating geometric units. Spot UV + holo foil.
-Tagline “Who are you today?” centered beneath masthead in ultra-light italic.
-Subject’s gaze directly engages reader; head breaks the baseline of the masthead for depth.
-Bottom left kicker “Future of Identity Issue” in tiny monospaced capitals.
+Masthead "MUSE MODULAR" across the top, extra-condensed modular sans serif; characters constructed from repeating geometric units. Spot UV + holo foil.
+Tagline "Who are you today?" centered beneath masthead in ultra-light italic.
+Subject's gaze directly engages reader; head breaks the baseline of the masthead for depth.
+Bottom left kicker "Future of Identity Issue" in tiny monospaced capitals.
 Discreet modular grid lines and data glyphs fade into matte charcoal background, preserving negative space.
 • Color Palette
 #000000, #1a1a1a, #4d4d4d, #d9d9d9 + holographic gradient (#00eaff, #c400ff, #38ffab).
