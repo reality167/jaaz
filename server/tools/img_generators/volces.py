@@ -45,11 +45,19 @@ class VolcesImageGenerator(ImageGenerator):
                     }
                 )
 
+            if not result or not result.data or len(result.data) == 0:
+                raise ValueError("No image data returned from Volces API")
+
             image_url = result.data[0].url
             image_id = generate_image_id()
             mime_type, width, height, extension = await get_image_info_and_save(
                 image_url, os.path.join(FILES_DIR, f'{image_id}'), is_b64=False
             )
+
+            # Ensure mime_type is not None
+            if mime_type is None:
+                mime_type = "image/png"  # Default to PNG if mime_type is None
+
             filename = f'{image_id}.{extension}'
             return mime_type, width, height, filename
 

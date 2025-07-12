@@ -64,6 +64,8 @@ const PROVIDER_OPTIONS = [
         'doubao-seed-1-6-250615': { type: 'text' },
         'doubao-seed-1-6-thinking-250615': { type: 'text' },
         'doubao-seed-1-6-flash-250615': { type: 'text' },
+        'deepseek-v3-250324': { type: 'text' },
+        'deepseek-r1-250528': { type: 'text' },
         'doubao-seedream-3-0-t2i-250415': { type: 'image' },
       },
     },

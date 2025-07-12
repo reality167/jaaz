@@ -39,17 +39,17 @@ def get_ollama_model_list():
 async def get_models():
     config = config_service.get_config()
     res = []
-    ollama_models = get_ollama_model_list()
-    ollama_url = config_service.get_config().get('ollama', {}).get(
-        'url', os.getenv('OLLAMA_HOST', 'http://localhost:11434'))
-    print('👇ollama_models', ollama_models)
-    for ollama_model in ollama_models:
-        res.append({
-            'provider': 'ollama',
-            'model': ollama_model,
-            'url': ollama_url,
-            'type': 'text'
-        })
+    # ollama_models = get_ollama_model_list()
+    # ollama_url = config_service.get_config().get('ollama', {}).get(
+    #     'url', os.getenv('OLLAMA_HOST', 'http://localhost:11434'))
+    # print('👇ollama_models', ollama_models)
+    # for ollama_model in ollama_models:
+    #     res.append({
+    #         'provider': 'ollama',
+    #         'model': ollama_model,
+    #         'url': ollama_url,
+    #         'type': 'text'
+    #     })
     for provider in config.keys():
         models = config[provider].get('models', {})
         for model_name in models:

@@ -107,21 +107,36 @@ class LiblibaiGenerator(ImageGenerator):
         **kwargs
     ) -> tuple:
         try:
-            # 构建生成参数
-            image_size = self._convert_aspect_ratio_to_size(aspect_ratio)
+            # 构建生成参数 - 只使用aspectRatio，移除imageSize避免参数冲突
             aspect_ratio_name = self._get_aspect_ratio_name(aspect_ratio)
+            
+            # 检测是否包含中文文字生成需求
+            has_chinese_text = self._detect_chinese_text_need(prompt)
+            
+            # 如果包含中文文字，优化提示词
+            if has_chinese_text:
+                prompt = self._optimize_chinese_text_prompt(prompt)
+                print(f"🈳 检测到中文文字生成需求，已优化提示词")
             
             generate_params = {
                 "prompt": prompt,
                 "aspectRatio": aspect_ratio_name,
-                "imageSize": image_size,
                 "imgCount": kwargs.get("img_count", 1),
-                "steps": kwargs.get("steps", 30),  # 建议30步
+                "steps": kwargs.get("steps", 40 if has_chinese_text else 30),  # 中文文字需要更多步数
             }
 
-            # 如果有负面提示词
-            if kwargs.get("negative_prompt"):
-                generate_params["negativePrompt"] = kwargs.get("negative_prompt")
+            # 处理负面提示词
+            negative_prompt = kwargs.get("negative_prompt", "")
+            if has_chinese_text:
+                # 为中文文字生成添加专门的负面提示词
+                chinese_negative = "blurry text, distorted characters, illegible text, broken strokes, overlapping text, malformed characters, watermark, signature, username, artist name, copyright, logo, text artifacts, unreadable font, pixelated text, corrupted text"
+                if negative_prompt:
+                    negative_prompt = f"{negative_prompt}, {chinese_negative}"
+                else:
+                    negative_prompt = chinese_negative
+            
+            if negative_prompt:
+                generate_params["negativePrompt"] = negative_prompt
 
             # 如果有输入图像，添加ControlNet参数
             if input_image:
@@ -137,6 +152,7 @@ class LiblibaiGenerator(ImageGenerator):
             }
 
             print(f"🎨 开始使用LiblibAI星流Star-3 Alpha生成图像，提示词: {prompt[:50]}...")
+            print(f"📐 使用纵横比: {aspect_ratio} -> {aspect_ratio_name}")
 
             # 发起生成请求
             generate_uuid = await self._create_generation_task(data)
@@ -158,6 +174,39 @@ class LiblibaiGenerator(ImageGenerator):
             print(f'LiblibAI图像生成错误: {e}')
             traceback.print_exc()
             raise e
+    
+    def _detect_chinese_text_need(self, prompt: str) -> bool:
+        """检测是否需要生成中文文字"""
+        import re
+        
+        # 检测中文字符
+        chinese_chars = re.findall(r'[\u4e00-\u9fff]', prompt)
+        
+        # 检测文字生成相关关键词
+        text_keywords = ['标题', '文字', '字体', '海报', '横幅', 'banner', 'poster', 'title', 'text', '书法', '字', '题字']
+        
+        # 如果包含中文字符且包含文字相关关键词，则认为需要生成中文文字
+        has_chinese = len(chinese_chars) > 0
+        has_text_keywords = any(keyword in prompt.lower() for keyword in text_keywords)
+        
+        return has_chinese and has_text_keywords
+    
+    def _optimize_chinese_text_prompt(self, prompt: str) -> str:
+        """优化中文文字生成的提示词"""
+        # 添加文字质量增强关键词
+        quality_enhancers = [
+            "high quality typography",
+            "clear readable Chinese text", 
+            "professional font design",
+            "sharp text details",
+            "perfect character strokes",
+            "clean typography layout"
+        ]
+        
+        # 将质量增强词添加到提示词末尾
+        enhanced_prompt = f"{prompt}, {', '.join(quality_enhancers)}"
+        
+        return enhanced_prompt
 
     async def _create_generation_task(self, data: dict) -> str:
         """创建星流Star-3 Alpha图像生成任务"""
