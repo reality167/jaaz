@@ -88,15 +88,23 @@ const CanvasExcali: React.FC<CanvasExcaliProps> = ({
 
   const addImageToExcalidraw = useCallback(
     async (imageElement: ExcalidrawImageElement, file: BinaryFileData) => {
-      if (!excalidrawAPI) return
+      if (!excalidrawAPI) {
+        console.log('❌ excalidrawAPI不存在')
+        return
+      }
 
+      console.log('👇 添加文件到Excalidraw:', file)
       excalidrawAPI.addFiles([file])
 
       const currentElements = excalidrawAPI.getSceneElements()
-      console.log('👇 adding to currentElements', currentElements)
+      console.log('👇 当前画布元素数量:', currentElements?.length || 0)
+      console.log('👇 要添加的元素:', imageElement)
+      
       excalidrawAPI.updateScene({
         elements: [...(currentElements || []), imageElement],
       })
+
+      console.log('✅ 图层已添加到画布')
 
       localStorage.setItem(
         'excalidraw-last-image-position',
@@ -118,11 +126,31 @@ const CanvasExcali: React.FC<CanvasExcaliProps> = ({
     [addImageToExcalidraw]
   )
 
+  const handleLayerAdded = useCallback(
+    (layerData: ISocket.SessionLayerAddedEvent) => {
+      console.log('👇layer_added', layerData)
+      console.log('👇canvasId:', canvasId)
+      console.log('👇layerData.canvas_id:', layerData.canvas_id)
+      
+      if (layerData.canvas_id !== canvasId) {
+        console.log('⚠️ Canvas ID不匹配，跳过图层添加')
+        return
+      }
+
+      console.log('✅ 开始添加图层到画布')
+      addImageToExcalidraw(layerData.element, layerData.file)
+    },
+    [addImageToExcalidraw, canvasId]
+  )
+
   useEffect(() => {
     eventBus.on('Socket::Session::ImageGenerated', handleImageGenerated)
-    return () =>
+    eventBus.on('Socket::Session::LayerAdded', handleLayerAdded)
+    return () => {
       eventBus.off('Socket::Session::ImageGenerated', handleImageGenerated)
-  }, [handleImageGenerated])
+      eventBus.off('Socket::Session::LayerAdded', handleLayerAdded)
+    }
+  }, [handleImageGenerated, handleLayerAdded])
 
   return (
     <Excalidraw

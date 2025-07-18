@@ -75,3 +75,15 @@ export async function deleteCanvas(id: string): Promise<void> {
   })
   return await response.json()
 }
+
+export async function splitLayers(
+  id: string,
+  data?: any
+): Promise<{ success: boolean; message: string; canvas_id: string }> {
+  const response = await fetch(`/api/canvas/${id}/split-layers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data || {}),
+  })
+  return await response.json()
+}

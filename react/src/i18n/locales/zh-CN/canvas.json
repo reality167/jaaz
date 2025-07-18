@@ -43,6 +43,7 @@
     "zoomFit": "缩放至适合"
   },
   "popbar": {
-    "addToChat": "添加到对话"
+    "addToChat": "添加到对话",
+    "splitLayers": "拆分图层"
   }
 }

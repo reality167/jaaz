@@ -17,3 +17,13 @@ build
 # User data
 user_data/
 jaaz/*
+temp/*
+
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.development
+*.key
+*.pem
+secrets.json

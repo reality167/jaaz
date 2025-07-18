@@ -12,6 +12,7 @@ export enum SessionEventType {
   ToolCallArguments = 'tool_call_arguments',
   AllMessages = 'all_messages',
   ToolCallProgress = 'tool_call_progress',
+  LayerAdded = 'layer_added',
 }
 
 export interface SessionBaseEvent {
@@ -60,6 +61,14 @@ export interface SessionToolCallProgressEvent extends SessionBaseEvent {
   update: string
 }
 
+export interface SessionLayerAddedEvent extends SessionBaseEvent {
+  type: SessionEventType.LayerAdded
+  element: ExcalidrawImageElement
+  file: BinaryFileData
+  canvas_id: string
+  content: string
+}
+
 export type SessionUpdateEvent =
   | SessionDeltaEvent
   | SessionToolCallEvent
@@ -70,3 +79,4 @@ export type SessionUpdateEvent =
   | SessionDoneEvent
   | SessionErrorEvent
   | SessionInfoEvent
+  | SessionLayerAddedEvent

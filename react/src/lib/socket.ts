@@ -81,6 +81,10 @@ export class SocketIOManager {
       this.handleSessionUpdate(data)
     })
 
+    this.socket.on('canvas_notification', (data) => {
+      this.handleCanvasNotification(data)
+    })
+
     this.socket.on('pong', (data) => {
       console.log('🔗 Pong received:', data)
     })
@@ -88,6 +92,8 @@ export class SocketIOManager {
 
   private handleSessionUpdate(data: ISocket.SessionUpdateEvent) {
     const { session_id, type } = data
+
+    console.log('🔍 Session update received:', { session_id, type, data })
 
     if (!session_id) {
       console.warn('⚠️ Session update missing session_id:', data)
@@ -122,8 +128,27 @@ export class SocketIOManager {
       case ISocket.SessionEventType.Info:
         eventBus.emit('Socket::Session::Info', data)
         break
+      case ISocket.SessionEventType.LayerAdded:
+        eventBus.emit('Socket::Session::LayerAdded', data)
+        break
       default:
         console.log('⚠️ Unknown session update type:', type)
+    }
+  }
+
+  private handleCanvasNotification(data: any) {
+    console.log('🎨 Canvas notification received:', data)
+    
+    // 根据通知类型处理不同的消息
+    switch (data.type) {
+      case 'split_layers_success':
+        eventBus.emit('Canvas::SplitLayersSuccess', data)
+        break
+      case 'split_layers_error':
+        eventBus.emit('Canvas::SplitLayersError', data)
+        break
+      default:
+        console.log('⚠️ Unknown canvas notification type:', data.type)
     }
   }
 

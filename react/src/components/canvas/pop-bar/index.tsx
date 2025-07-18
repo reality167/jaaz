@@ -31,13 +31,13 @@ const CanvasPopbarWrapper = () => {
       .filter((image) => image.fileId)
       .map((image) => {
         const file = files[image.fileId!]
-        const isBase64 = file.dataURL.startsWith('data:')
-        const id = isBase64 ? file.id : file.dataURL.split('/').at(-1)!
         return {
-          fileId: id,
-          base64: isBase64 ? file.dataURL : undefined,
+          fileId: image.fileId!,
+          base64: file?.dataURL || undefined,
           width: image.width,
           height: image.height,
+          x: image.x,
+          y: image.y,
         }
       })
 
