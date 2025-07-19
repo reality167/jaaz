@@ -5,6 +5,8 @@
   "share": "Share Canvas",
   "export": "Export Canvas",
   "exportImages": "Export Images",
+  "exportSVG": "Export SVG",
+  "exportPNG": "Export PNG",
   "import": "Import Canvas",
   "untitled": "Untitled",
   "back": "Back",
@@ -20,8 +22,11 @@
     "failedToDelete": "Failed to delete canvas",
     "failedToCreateFile": "Failed to create file",
     "noImagesSelected": "No images selected",
+    "noElementsSelected": "No elements selected",
     "exportingImages": "Exporting images...",
-    "failedToExportImages": "Failed to export images"
+    "exportingSVG": "Exporting SVG...",
+    "failedToExportImages": "Failed to export images",
+    "failedToExportSVG": "Failed to export SVG"
   },
   "deleteDialog": {
     "title": "Delete Canvas",
