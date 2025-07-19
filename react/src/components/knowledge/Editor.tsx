@@ -29,11 +29,7 @@ import { Textarea } from '../ui/textarea'
 import { Switch } from '../ui/switch'
 import { ImagePlusIcon, SaveIcon } from 'lucide-react'
 import { Button } from '../ui/button'
-import MarkdownIt from 'markdown-it'
-import MdEditor from 'react-markdown-editor-lite'
-import 'react-markdown-editor-lite/lib/index.css'
 import { uploadImage } from '@/api/upload'
-const mdParser = new MarkdownIt()
 
 type MediaFile = {
   path: string
@@ -149,6 +145,7 @@ export default function Editor({ knowledgeID }: { knowledgeID: string }) {
     console.log('res', res)
     return res.url
   }
+
   return (
     <div className="mb-5 p-5">
       <div
@@ -165,13 +162,39 @@ export default function Editor({ knowledgeID }: { knowledgeID: string }) {
         </Button>
       </div>
       <div className="overflow-y-auto">
-        <div className="mb-5 border rounded-md overflow-hidden">
-          <MdEditor
-            value={editorContent}
-            style={{ height: '80vh' }}
-            renderHTML={(text) => mdParser.render(text)}
-            onChange={({ text }) => setEditorContentWrapper(text)}
-            onImageUpload={handleImageUpload}
+        <div className="mb-5 border rounded-md overflow-hidden" style={{ height: '80vh' }}>
+          <MDXEditor
+            ref={mdxEditorRef}
+            markdown={editorContent}
+            onChange={setEditorContentWrapper}
+            plugins={[
+              headingsPlugin(),
+              listsPlugin(),
+              quotePlugin(),
+              thematicBreakPlugin(),
+              markdownShortcutPlugin(),
+              linkPlugin(),
+              imagePlugin({
+                imageUploadHandler: handleImageUpload,
+              }),
+              toolbarPlugin({
+                toolbarContents: () => (
+                  <>
+                    <UndoRedo />
+                    <Separator />
+                    <BoldItalicUnderlineToggles />
+                    <CodeToggle />
+                    <Separator />
+                    <ListsToggle />
+                    <BlockTypeSelect />
+                    <Separator />
+                    <CreateLink />
+                    <InsertImage />
+                    <InsertTable />
+                  </>
+                ),
+              }),
+            ]}
           />
         </div>
       </div>

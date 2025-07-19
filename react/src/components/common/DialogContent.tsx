@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import * as Dialog from '@radix-ui/react-dialog'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, easeOut, easeInOut } from 'motion/react'
 
 type CommonDialogProps = {
   open: boolean
@@ -23,11 +23,11 @@ const CommonDialogContent: React.FC<CommonDialogProps> = ({
     z: 0,
     transition: {
       duration: 0.5,
-      ease: [0.17, 0.67, 0.51, 1],
+      ease: easeOut,
       opacity: {
         delay: 0.2,
         duration: 0.4,
-        ease: 'easeOut',
+        ease: easeOut,
       },
     },
   }
@@ -40,7 +40,7 @@ const CommonDialogContent: React.FC<CommonDialogProps> = ({
     rotateX: 25,
     transition: {
       duration: 0.3,
-      ease: [0.67, 0.17, 0.62, 0.64],
+      ease: easeInOut,
     },
   }
 
