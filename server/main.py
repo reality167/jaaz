@@ -5,6 +5,27 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
+# 加载环境变量
+try:
+    from dotenv import load_dotenv
+    # 尝试从多个位置加载.env文件
+    env_paths = [
+        os.path.join(os.path.dirname(__file__), '.env'),  # 当前目录
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'),  # 上级目录
+        os.path.join(os.path.dirname(__file__), '_internal', '.env'),  # _internal目录（打包后）
+        '.env'  # 根目录
+    ]
+    
+    for env_path in env_paths:
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            print(f"🌟 已加载环境变量文件: {env_path}")
+            break
+    else:
+        print("⚠️  未找到.env文件，将使用系统环境变量")
+except ImportError:
+    print("⚠️  python-dotenv未安装，将使用系统环境变量")
+
 from routers import config, agent, workspace, image_tools, canvas, ssl_test, chat_router, settings, layer_split
 import routers.websocket_router
 from fastapi.responses import FileResponse

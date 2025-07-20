@@ -82,3 +82,4 @@ websockets==15.0.1
 wsproto==1.2.0
 xxhash==3.5.0
 zstandard==0.23.0
+tos==2.8.4

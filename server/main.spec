@@ -6,7 +6,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[(certifi.where(), 'certifi'), ('asset', 'asset')],
+    datas=[(certifi.where(), 'certifi'), ('asset', 'asset'), ('.env', '.')],
     hiddenimports=['certifi'],
     hookspath=[],
     hooksconfig={},
@@ -43,3 +43,5 @@ coll = COLLECT(
     upx_exclude=[],
     name='main',
 )
+
+
