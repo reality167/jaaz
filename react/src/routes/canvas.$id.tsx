@@ -101,7 +101,7 @@ function Canvas() {
 
           <ResizableHandle />
 
-          <ResizablePanel defaultSize={25} maxSize={35} minSize={25}>
+          <ResizablePanel defaultSize={25} maxSize={40} minSize={20}>
             <div className="flex-1 flex-grow bg-accent/50 w-full">
               <ChatInterface
                 canvasId={id}

@@ -188,28 +188,56 @@ async def generate_new_image_element(canvas_id: str, fileid: str, image_data: di
     canvas_data = canvas.get('data', {})
     elements = canvas_data.get('elements', [])
 
-    # find the last image element
-    last_x = 0
-    last_y = 0
-    last_width = 0
-    last_height = 0
+    # 找到所有图片元素
     image_elements = [
         element for element in elements if element.get('type') == 'image']
-    last_image_element = image_elements[-1] if len(
-        image_elements) > 0 else None
-    if last_image_element is not None:
+    
+    # 计算新图片的位置
+    new_x = 0
+    new_y = 0
+    
+    if len(image_elements) > 0:
+        # 获取最后一个图片元素的信息
+        last_image_element = image_elements[-1]
         last_x = last_image_element.get('x', 0)
         last_y = last_image_element.get('y', 0)
         last_width = last_image_element.get('width', 0)
         last_height = last_image_element.get('height', 0)
-
-    new_x = last_x + last_width + 20
+        
+        # 计算当前行已放置的图片数量
+        current_row_images = 0
+        current_row_y = last_y
+        
+        # 从最后一个图片往前查找同一行的图片
+        for i in range(len(image_elements) - 1, -1, -1):
+            element = image_elements[i]
+            element_y = element.get('y', 0)
+            # 如果y坐标相近（允许5像素的误差），认为是同一行
+            if abs(element_y - current_row_y) <= 5:
+                current_row_images += 1
+            else:
+                break
+        
+        # 如果当前行已经有4张图片，另起一行
+        if current_row_images >= 4:
+            # 找到当前行最左边的x坐标
+            min_x = min([elem.get('x', 0) for elem in image_elements if abs(elem.get('y', 0) - current_row_y) <= 5])
+            new_x = min_x
+            new_y = current_row_y + max([elem.get('height', 0) for elem in image_elements if abs(elem.get('y', 0) - current_row_y) <= 5]) + 20
+        else:
+            # 继续在当前行放置
+            new_x = last_x + last_width + 20
+            new_y = last_y
+    else:
+        # 第一张图片，从(0, 0)开始
+        new_x = 0
+        new_y = 0
 
     return {
         'type': 'image',
         'id': fileid,
         'x': new_x,
-        'y': last_y,
+        'y': new_y,
         'width': image_data.get('width', 0),
         'height': image_data.get('height', 0),
         'angle': 0,

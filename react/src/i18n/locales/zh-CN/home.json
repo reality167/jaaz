@@ -1,7 +1,27 @@
 {
-  "title": "你好，Jaaz！",
+  "title": "你好，ArtBox！",
   "subtitle": "准备好将你的想法变成艺术吗？",
   "allProjects": "所有项目",
   "noCanvases": "还没有画布",
-  "newCanvas": "未命名"
+  "newCanvas": "未命名",
+  "form": {
+    "title": "设计信息表单",
+    "companyName": "公司名",
+    "companyNamePlaceholder": "请输入公司名称",
+    "productName": "品名",
+    "productNamePlaceholder": "请输入产品名称",
+    "dimensions": "尺寸",
+    "dimensionsPlaceholder": "例如：1000x1000px",
+    "style": "风格",
+    "stylePlaceholder": "例如：现代简约、复古、科技感等",
+    "backgroundColor": "底色",
+    "backgroundColorPlaceholder": "例如：白色、黑色、蓝色等",
+    "description": "需求介绍",
+    "descriptionPlaceholder": "请描述您的设计需求",
+    "imageCount": "设计图数量",
+    "imageCountPlaceholder": "选择要生成的设计图数量",
+    "submit": "提交",
+    "cancel": "取消",
+    "validationError": "请填写公司名和品名"
+  }
 }

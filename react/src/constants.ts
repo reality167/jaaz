@@ -37,6 +37,10 @@ export const PROVIDER_NAME_MAPPING: {
     name: 'Volces',
     icon: 'https://portal.volccdn.com/obj/volcfe/misc/favicon.png',
   },
+  moonshot: {
+    name: '月之暗面',
+    icon: '/kimi-logo.png',  // 使用本地图片
+  },
   comfyui: {
     name: 'ComfyUI',
     icon: 'https://framerusercontent.com/images/3cNQMWKzIhIrQ5KErBm7dSmbd2w.png',
@@ -48,21 +52,23 @@ export const PROVIDER_NAME_MAPPING: {
 }
 
 export const DEFAULT_PROVIDERS_CONFIG: { [key: string]: LLMConfig } = {
-  anthropic: {
+  volces: {
     models: {
-      'claude-3-7-sonnet-latest': { type: 'text' },
+      'doubao-seed-1-6-250615': { type: 'text' },
+      'doubao-seed-1-6-thinking-250615': { type: 'text' },
+      'deepseek-v3-250324': { type: 'text' },
+      'deepseek-r1-250528': { type: 'text' },
+      'doubao-seedream-3-0-t2i-250415': { type: 'image' },
     },
-    url: 'https://api.anthropic.com/v1/',
+    url: 'https://ark.cn-beijing.volces.com/api/v3/',
     api_key: '',
     max_tokens: 8192,
   },
-  openai: {
+  moonshot: {
     models: {
-      'gpt-4o': { type: 'text' },
-      'gpt-4o-mini': { type: 'text' },
-      'gpt-image-1': { type: 'image' },
+      'kimi-k2-0711-preview': { type: 'text' },
     },
-    url: 'https://api.openai.com/v1/',
+    url: 'https://api.moonshot.cn/v1/',
     api_key: '',
     max_tokens: 8192,
   },
@@ -76,49 +82,6 @@ export const DEFAULT_PROVIDERS_CONFIG: { [key: string]: LLMConfig } = {
       'stability-ai/sdxl': { type: 'image' },
     },
     url: 'https://api.replicate.com/v1/',
-    api_key: '',
-    max_tokens: 8192,
-  },
-  jaaz: {
-    models: {
-      // text models
-      'gpt-4o': { type: 'text' },
-      'gpt-4o-mini': { type: 'text' },
-      'deepseek/deepseek-chat-v3-0324:free': { type: 'text' },
-      'deepseek/deepseek-chat-v3-0324': { type: 'text' },
-      'anthropic/claude-sonnet-4': { type: 'text' },
-      'anthropic/claude-3.7-sonnet': { type: 'text' },
-      // image models
-      'google/imagen-4': { type: 'image' },
-      'black-forest-labs/flux-1.1-pro': { type: 'image' },
-      'black-forest-labs/flux-kontext-pro': { type: 'image' },
-      'black-forest-labs/flux-kontext-max': { type: 'image' },
-      'recraft-ai/recraft-v3': { type: 'image' },
-      'openai/gpt-image-1': { type: 'image' },
-    },
-    url: `${BASE_API_URL}/api/v1/`,
-    api_key: '',
-    max_tokens: 8192,
-  },
-  wavespeed: {
-    models: {
-      'wavespeed-ai/flux-dev': { type: 'image' },
-    },
-    url: 'https://api.wavespeed.ai/api/v3/',
-    api_key: '',
-  },
-  comfyui: {
-    models: {
-      'flux-dev': { type: 'image' },
-      'flux-schnell': { type: 'image' },
-      sdxl: { type: 'image' },
-    },
-    url: 'http://127.0.0.1:8188',
-    api_key: '',
-  },
-  ollama: {
-    models: {},
-    url: 'http://localhost:11434',
     api_key: '',
     max_tokens: 8192,
   },
@@ -154,7 +117,7 @@ export const TOOL_CALL_NAME_MAPPING: { [key in ToolCallFunctionName]: string } =
     finish: 'Finish',
   }
 
-export const LOGO_URL = 'https://jaaz.app/favicon.ico'
+export const LOGO_URL = '/artbox.png'
 
 export const DEFAULT_SYSTEM_PROMPT = `You are a professional art design agent. You can write very professional image prompts to generate aesthetically pleasing images that best fulfilling and matching the user's request.
 Step 1. write a design strategy plan. Write in the same language as the user's inital first prompt.

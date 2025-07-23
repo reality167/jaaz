@@ -8,13 +8,14 @@ import { Message, Model } from '@/types/types'
 import { useMutation } from '@tanstack/react-query'
 import { useDrop } from 'ahooks'
 import { produce } from 'immer'
-import { ArrowUp, Loader2, PlusIcon, Square, XIcon } from 'lucide-react'
+import { ArrowUp, Loader2, PlusIcon, Square, XIcon, FileText } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Textarea, { TextAreaRef } from 'rc-textarea'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import ModelSelector from './ModelSelector'
+import ProjectFormDialog from '@/components/home/ProjectFormDialog'
 
 type ChatTextareaProps = {
   pending: boolean
@@ -29,6 +30,15 @@ type ChatTextareaProps = {
     }
   ) => void
   onCancelChat?: () => void
+  onFormSubmit?: (formData: {
+    companyName: string
+    productName: string
+    dimensions: string
+    style: string
+    backgroundColor: string
+    description: string
+    imageCount: number
+  }) => void
 }
 
 const ChatTextarea: React.FC<ChatTextareaProps> = ({
@@ -38,6 +48,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   sessionId,
   onSendMessages,
   onCancelChat,
+  onFormSubmit,
 }) => {
   const { t } = useTranslation()
   const { textModel, imageModel, imageModels, setShowInstallDialog } =
@@ -52,6 +63,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }[]
   >([])
   const [isFocused, setIsFocused] = useState(false)
+  const [isComposing, setIsComposing] = useState(false) // 添加输入法状态
 
   const imageInputRef = useRef<HTMLInputElement>(null)
 
@@ -195,6 +207,9 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }
   }, [uploadImageMutation])
 
+  // 添加表单对话框状态
+  const [showFormDialog, setShowFormDialog] = useState(false)
+
   return (
     <motion.div
       ref={dropAreaRef}
@@ -276,15 +291,17 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
 
       <Textarea
         ref={textareaRef}
-        className="w-full h-full border-none outline-none resize-none max-h-[calc(100vh-700px)]"
+        className="w-full border-none outline-none resize-none"
         placeholder={t('chat:textarea.placeholder')}
         value={prompt}
-        autoSize
+        autoSize={{ minRows: 1, maxRows: 8 }}
         onChange={(e) => setPrompt(e.target.value)}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={() => setIsComposing(false)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
+          if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
             e.preventDefault()
             handleSendPrompt()
           }
@@ -292,7 +309,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       />
 
       <div className="flex items-center justify-between gap-2 w-full">
-        <div className="flex items-center gap-2 max-w-[calc(100%-50px)]">
+        <div className="flex items-center gap-2 max-w-[calc(100%-100px)]">
           <input
             ref={imageInputRef}
             type="file"
@@ -307,6 +324,16 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
             onClick={() => imageInputRef.current?.click()}
           >
             <PlusIcon className="size-4" />
+          </Button>
+
+          {/* 新增表单按钮 */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowFormDialog(true)}
+            title="填写项目信息"
+          >
+            <FileText className="size-4" />
           </Button>
 
           <ModelSelector />
@@ -334,6 +361,13 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
           </Button>
         )}
       </div>
+
+      {/* 添加表单对话框 */}
+      <ProjectFormDialog
+        open={showFormDialog}
+        onOpenChange={setShowFormDialog}
+        onSubmit={onFormSubmit || (() => {})}
+      />
     </motion.div>
   )
 }

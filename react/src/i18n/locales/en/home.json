@@ -1,7 +1,27 @@
 {
-  "title": "Hello, Jaaz!",
+  "title": "Hello, ArtBox!",
   "subtitle": "Ready to turn your ideas into art?",
   "allProjects": "All Projects",
   "noCanvases": "No canvases yet",
-  "newCanvas": "Untitled"
+  "newCanvas": "Untitled",
+  "form": {
+    "title": "Project Information Form",
+    "companyName": "Company Name",
+    "companyNamePlaceholder": "Enter company name",
+    "productName": "Product Name",
+    "productNamePlaceholder": "Enter product name",
+    "dimensions": "Dimensions",
+    "dimensionsPlaceholder": "e.g., 1000x1000px",
+    "style": "Style",
+    "stylePlaceholder": "e.g., Modern, Retro, Tech, etc.",
+    "backgroundColor": "Background Color",
+    "backgroundColorPlaceholder": "e.g., White, Black, Blue, etc.",
+    "description": "Description",
+    "descriptionPlaceholder": "Describe your design requirements",
+    "imageCount": "Number of Designs",
+    "imageCountPlaceholder": "Select the number of designs to generate",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "validationError": "Please fill in company name and product name"
+  }
 }

@@ -70,7 +70,6 @@ const PROVIDER_OPTIONS = [
       },
     },
   },
-
   {
     value: '硅基流动',
     label: '硅基流动 (SiliconFlow)',
@@ -81,11 +80,7 @@ const PROVIDER_OPTIONS = [
     label: '智谱 AI (GLM)',
     data: { apiUrl: 'https://open.bigmodel.cn/api/paas/v4/' },
   },
-  {
-    value: '月之暗面',
-    label: '月之暗面 (Kimi)',
-    data: { apiUrl: 'https://api.moonshot.cn/v1/' },
-  },
+  // 移除月之暗面选项，因为它现在是默认提供商
 ]
 
 export default function AddProviderDialog({

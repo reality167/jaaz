@@ -14,6 +14,7 @@ a = Analysis(
     excludes=[],
     noarchive=False,
     optimize=0,
+    collect_all=['tos'],
 )
 pyz = PYZ(a.pure)
 
