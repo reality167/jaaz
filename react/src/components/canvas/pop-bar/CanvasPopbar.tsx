@@ -21,6 +21,7 @@ const CanvasPopbar = ({ pos, selectedImages }: CanvasPopbarProps) => {
   const { excalidrawAPI } = useCanvas()
   const { id: canvasId } = useParams({ from: '/canvas/$id' })
 
+  // 添加到聊天处理函数
   const handleAddToChat = () => {
     eventBus.emit('Canvas::AddImagesToChat', selectedImages)
     excalidrawAPI?.updateScene({
@@ -28,14 +29,12 @@ const CanvasPopbar = ({ pos, selectedImages }: CanvasPopbarProps) => {
     })
   }
 
-  // 拆分图层处理函数
+  // 拆分图层处理函数 - 异步版本
   const handleSplitLayers = async () => {
     try {
       console.log('=== 前端调试信息 ===')
       console.log('画布ID:', canvasId)
       console.log('选中的图片:', selectedImages)
-      console.log('selectedImages类型:', typeof selectedImages)
-      console.log('selectedImages长度:', selectedImages?.length || 0)
       
       if (selectedImages && selectedImages.length > 0) {
         selectedImages.forEach((img, index) => {
@@ -56,9 +55,9 @@ const CanvasPopbar = ({ pos, selectedImages }: CanvasPopbarProps) => {
         return
       }
       
-      // 立即显示"已在后台执行"提示
-      toast.info('图层拆分已开始', {
-        description: '正在后台执行',
+      // 立即显示"任务已提交"提示
+      toast.info('图层拆分任务已提交', {
+        description: '正在后台处理，请稍候',
         duration: 3000,
       })
       
@@ -67,11 +66,20 @@ const CanvasPopbar = ({ pos, selectedImages }: CanvasPopbarProps) => {
         appState: { selectedElementIds: {} },
       })
       
-      // 异步调用拆分图层API（不等待结果）
-      splitLayers(canvasId, { selectedImages }).catch((error) => {
-        console.error('拆分图层失败:', error)
-        // 错误处理已经在WebSocket监听器中处理
-      })
+      // 提交异步任务
+      const result = await splitLayers(canvasId, { selectedImages })
+      
+      if (result.success) {
+        console.log('✅ 图层拆分任务已提交:', result.task_id)
+        toast.success('任务已提交', {
+          description: `任务ID: ${result.task_id}`,
+        })
+      } else {
+        console.error('❌ 提交任务失败:', result.message)
+        toast.error('提交任务失败', {
+          description: result.message,
+        })
+      }
       
     } catch (error) {
       console.error('拆分图层失败:', error)
@@ -81,8 +89,16 @@ const CanvasPopbar = ({ pos, selectedImages }: CanvasPopbarProps) => {
     }
   }
 
-  // 监听websocket消息
+  // 监听websocket消息 - 更新以支持任务进度
   useEffect(() => {
+    const handleSplitLayersStarted = (data: any) => {
+      if (data.canvas_id === canvasId) {
+        toast.info('图层拆分已开始', {
+          description: `任务ID: ${data.task_id}`,
+        })
+      }
+    }
+
     const handleSplitLayersSuccess = (data: any) => {
       if (data.canvas_id === canvasId) {
         toast.success(data.message, {
@@ -99,12 +115,31 @@ const CanvasPopbar = ({ pos, selectedImages }: CanvasPopbarProps) => {
       }
     }
 
+    const handleTaskProgress = (data: any) => {
+      if (data.canvas_id === canvasId) {
+        const progress = data.progress
+        console.log(`任务进度: ${progress.percentage.toFixed(1)}% - ${progress.message}`)
+        
+        // 可以在这里更新进度条或显示详细进度
+        if (progress.percentage > 0 && progress.percentage < 100) {
+          toast.info(progress.message, {
+            description: `进度: ${progress.percentage.toFixed(1)}%`,
+            duration: 2000,
+          })
+        }
+      }
+    }
+
+    eventBus.on('Canvas::SplitLayersStarted', handleSplitLayersStarted)
     eventBus.on('Canvas::SplitLayersSuccess', handleSplitLayersSuccess)
     eventBus.on('Canvas::SplitLayersError', handleSplitLayersError)
+    eventBus.on('Canvas::TaskProgress', handleTaskProgress)
 
     return () => {
+      eventBus.off('Canvas::SplitLayersStarted', handleSplitLayersStarted)
       eventBus.off('Canvas::SplitLayersSuccess', handleSplitLayersSuccess)
       eventBus.off('Canvas::SplitLayersError', handleSplitLayersError)
+      eventBus.off('Canvas::TaskProgress', handleTaskProgress)
     }
   }, [canvasId])
 

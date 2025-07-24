@@ -128,16 +128,18 @@ const CanvasExcali: React.FC<CanvasExcaliProps> = ({
 
   const handleLayerAdded = useCallback(
     (layerData: ISocket.SessionLayerAddedEvent) => {
-      console.log('👇layer_added', layerData)
-      console.log('👇canvasId:', canvasId)
-      console.log('👇layerData.canvas_id:', layerData.canvas_id)
+      console.log('👇layer_added 事件收到:', layerData)
+      console.log('👇当前canvasId:', canvasId)
+      console.log('👇事件canvas_id:', layerData.canvas_id)
+      console.log('👇图层元素:', layerData.element)
+      console.log('👇文件数据:', layerData.file)
       
       if (layerData.canvas_id !== canvasId) {
         console.log('⚠️ Canvas ID不匹配，跳过图层添加')
         return
       }
 
-      console.log('✅ 开始添加图层到画布')
+      console.log('✅ Canvas ID匹配，开始添加图层到画布')
       addImageToExcalidraw(layerData.element, layerData.file)
     },
     [addImageToExcalidraw, canvasId]

@@ -38,6 +38,7 @@ from starlette.types import Scope
 from starlette.responses import Response
 import socketio
 from services.websocket_state import sio
+from services.task_queue_service import task_queue_service
 
 root_dir = os.path.dirname(__file__)
 
@@ -45,8 +46,10 @@ root_dir = os.path.dirname(__file__)
 async def lifespan(app: FastAPI):
     # onstartup
     await agent.initialize()
+    await task_queue_service.start()  # 启动任务队列服务
     yield
     # onshutdown
+    await task_queue_service.stop()  # 停止任务队列服务
 
 app = FastAPI(lifespan=lifespan)
 

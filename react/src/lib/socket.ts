@@ -141,11 +141,20 @@ export class SocketIOManager {
     
     // 根据通知类型处理不同的消息
     switch (data.type) {
+      case 'split_layers_started':
+        eventBus.emit('Canvas::SplitLayersStarted', data)
+        break
       case 'split_layers_success':
         eventBus.emit('Canvas::SplitLayersSuccess', data)
         break
       case 'split_layers_error':
         eventBus.emit('Canvas::SplitLayersError', data)
+        break
+      case 'split_layers_cancelled':
+        eventBus.emit('Canvas::SplitLayersCancelled', data)
+        break
+      case 'task_progress':
+        eventBus.emit('Canvas::TaskProgress', data)
         break
       default:
         console.log('⚠️ Unknown canvas notification type:', data.type)
