@@ -72,9 +72,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [sessionList, searchSessionId])
 
   const [messages, setMessages] = useState<Message[]>([])
-  const [pending, setPending] = useState<PendingType>(
-    initCanvas ? 'text' : false
-  )
+  // 修改 pending 状态初始化逻辑，始终初始化为 false
+  // 这样可以避免聊天区域的输入按钮一直显示加载状态
+  const [pending, setPending] = useState<PendingType>(false)
 
   const sessionId = session?.id
 
@@ -103,6 +103,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
 
       setPending('text')
+      
+      // 添加超时处理，防止按钮一直处于加载状态
+      // 如果 20 秒后仍未收到完成信号，自动重置 pending 状态
+      const timeoutId = setTimeout(() => {
+        setPending((currentPending) => {
+          // 只有当当前状态仍为 'text' 时才重置
+          return currentPending === 'text' ? false : currentPending
+        })
+      }, 20000)
+      
       setMessages(
         produce((prev) => {
           const last = prev.at(-1)
@@ -129,6 +139,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         })
       )
       scrollToBottom()
+      
+      // 清除之前的超时
+      return () => clearTimeout(timeoutId)
     },
     [sessionId, scrollToBottom]
   )
@@ -223,6 +236,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       console.log('⭐️dispatching image_generated', data)
       setPending('image')
+      
+      // 添加超时处理，防止按钮一直处于加载状态
+      // 如果 5 秒后仍未收到完成信号，自动重置 pending 状态
+      setTimeout(() => {
+        setPending((currentPending) => {
+          // 只有当当前状态仍为 'image' 时才重置
+          return currentPending === 'image' ? false : currentPending
+        })
+      }, 5000)
     },
     [canvasId, sessionId]
   )
@@ -318,12 +340,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const data = await resp.json()
     const msgs = data?.length ? data : []
     setMessages(msgs)
-    if (msgs.length > 0) {
-      setInitCanvas(false)
-    }
+    
+    // 移除手动设置initCanvas的代码，保持与首页有文本进入画布的行为一致
+    // setInitCanvas(true)
 
     scrollToBottom()
-  }, [sessionId, scrollToBottom, setInitCanvas])
+  }, [sessionId, scrollToBottom])
 
   useEffect(() => {
     initChat()
@@ -353,18 +375,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }
 
   const onSendMessages = useCallback(
-    (data: Message[], configs: { textModel: Model; imageModel: Model }) => {
+    (data: Message[], configs: { textModel: Model; imageModel: Model; systemPrompt?: string }) => {
+      // 始终将pending设置为'text'，确保显示思考过程
       setPending('text')
-      setMessages(data)
+      
+      // 确保在消息列表末尾有一个空的助手消息来显示思考状态
+      let messagesWithThinking = [...data]
+      const lastMessage = messagesWithThinking[messagesWithThinking.length - 1]
+      if (!lastMessage || lastMessage.role !== 'assistant') {
+        messagesWithThinking.push({
+          role: 'assistant',
+          content: '',
+        })
+      }
+      
+      setMessages(messagesWithThinking)
 
       sendMessages({
         sessionId: sessionId!,
         canvasId: canvasId,
-        newMessages: data,
+        newMessages: data, // 发送原始消息，不包含我们添加的空助手消息
         textModel: configs.textModel,
         imageModel: configs.imageModel,
-        systemPrompt:
-          localStorage.getItem('system_prompt') || DEFAULT_SYSTEM_PROMPT,
+        systemPrompt: configs.systemPrompt || localStorage.getItem('system_prompt') || DEFAULT_SYSTEM_PROMPT,
       })
 
       if (searchSessionId !== sessionId) {
@@ -462,22 +495,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           ) : (
             <motion.div className="flex flex-col h-full p-4 items-start justify-start pt-16 select-none">
-              <motion.span
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="text-muted-foreground text-3xl"
-              >
-                <ShinyText text="Hello, Jaaz!" />
-              </motion.span>
-              <motion.span
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="text-muted-foreground text-2xl"
-              >
-                <ShinyText text="How can I help you today?" />
-              </motion.span>
             </motion.div>
           )}
         </ScrollArea>

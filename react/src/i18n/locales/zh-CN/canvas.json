@@ -49,6 +49,8 @@
   },
   "popbar": {
     "addToChat": "添加到对话",
-    "splitLayers": "拆分图层"
+    "splitLayers": "拆分图层",
+    "addedToChat": "添加成功",
+    "imageAddedToChat": "已将图像添加到对话区"
   }
 }

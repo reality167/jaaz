@@ -10,6 +10,13 @@ export type TCanvasAddImagesToChatEvent = Array<{
   y: number
 }>
 
+// 添加图像预览事件类型
+export type TImagePreviewEvent = Array<{
+  file_id: string
+  width: number
+  height: number
+}>
+
 export type TEvents = {
   // ********** Socket events - Start **********
   'Socket::Session::Error': ISocket.SessionErrorEvent
@@ -26,6 +33,7 @@ export type TEvents = {
 
   // ********** Canvas events - Start **********
   'Canvas::AddImagesToChat': TCanvasAddImagesToChatEvent
+  'Canvas::ImagesToPreview': TImagePreviewEvent  // 添加图像预览事件
   'Canvas::SplitLayers': TCanvasAddImagesToChatEvent
   'Canvas::SplitLayersStarted': {
     type: string

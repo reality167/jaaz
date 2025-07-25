@@ -67,6 +67,7 @@ const PROVIDER_OPTIONS = [
         'deepseek-v3-250324': { type: 'text' },
         'deepseek-r1-250528': { type: 'text' },
         'doubao-seedream-3-0-t2i-250415': { type: 'image' },
+        'doubao-seededit-3-0-i2i-250628': { type: 'image' },
       },
     },
   },

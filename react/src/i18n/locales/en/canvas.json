@@ -48,6 +48,8 @@
   },
   "popbar": {
     "addToChat": "Add to chat",
-    "splitLayers": "Split Layers"
+    "splitLayers": "Split Layers",
+    "addedToChat": "Added successfully",
+    "imageAddedToChat": "Image added to chat area"
   }
 }
