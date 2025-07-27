@@ -34,6 +34,9 @@ export class SocketIOManager {
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
+        // @ts-ignore - Socket.IO支持这些选项，但TypeScript定义可能不完整
+        pingTimeout: 60000,  // 增加到60秒，防止长时间操作时超时
+        pingInterval: 25000  // 增加心跳间隔到25秒
       })
 
       this.socket.on('connect', () => {
@@ -93,7 +96,19 @@ export class SocketIOManager {
   private handleSessionUpdate(data: ISocket.SessionUpdateEvent) {
     const { session_id, type } = data
 
-    console.log('🔍 Session update received:', { session_id, type, data })
+    console.log('🔍 Session update received:', { session_id, type })
+    
+    // 详细记录layer_added事件
+    if (type === 'layer_added') {
+      console.log('📊 Layer added event details:', {
+        session_id,
+        canvas_id: (data as any).canvas_id,
+        content: (data as any).content,
+        element_id: (data as any).element?.id,
+        file_id: (data as any).file?.id,
+        file_url: (data as any).file?.dataURL
+      })
+    }
 
     if (!session_id) {
       console.warn('⚠️ Session update missing session_id:', data)
@@ -131,6 +146,9 @@ export class SocketIOManager {
       case ISocket.SessionEventType.LayerAdded:
         eventBus.emit('Socket::Session::LayerAdded', data)
         break
+      case 'layer_added': // 添加对字符串类型'layer_added'的处理
+        eventBus.emit('Socket::Session::LayerAdded', data)
+        break
       default:
         console.log('⚠️ Unknown session update type:', type)
     }
@@ -146,6 +164,7 @@ export class SocketIOManager {
         break
       case 'split_layers_success':
         eventBus.emit('Canvas::SplitLayersSuccess', data)
+        eventBus.emit('Canvas::AdjustView', { canvas_id: data.canvas_id })
         break
       case 'split_layers_error':
         eventBus.emit('Canvas::SplitLayersError', data)

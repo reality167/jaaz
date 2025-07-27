@@ -74,6 +74,9 @@ export type TEvents = {
       message: string
     }
   }
+  'Canvas::AdjustView': {
+    canvas_id: string
+  }
   // ********** Canvas events - End **********
 }
 

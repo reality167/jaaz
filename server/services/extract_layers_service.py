@@ -4,221 +4,69 @@ from typing import Dict, List, Any, Optional, Union
 import os
 import time
 import requests
-import tos
-from PIL import Image, ImageDraw, ImageFont
-from openai import OpenAI
+import sys
+import os.path as path
+
+# 添加相对导入支持
+# 如果作为主程序运行，添加父目录到sys.path
+if __name__ == "__main__":
+    # 获取当前文件的目录
+    current_dir = path.dirname(path.abspath(__file__))
+    # 获取父目录（services的父目录）
+    parent_dir = path.dirname(current_dir)
+    # 将父目录添加到Python路径
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+        print(f"已将父目录添加到Python路径: {parent_dir}")
+
+# 尝试导入必要的库
+try:
+    import tos
+except ImportError:
+    print("警告: 无法导入tos库，请安装: pip install tos")
+    # 创建一个假的tos模块，避免导入错误
+    class FakeTos:
+        class exceptions:
+            class TosClientError(Exception): pass
+            class TosServerError(Exception): pass
+    tos = FakeTos()
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    print("警告: 无法导入PIL库，请安装: pip install pillow")
+    raise
+
+try:
+    from openai import OpenAI
+except ImportError:
+    print("警告: 无法导入openai库，请安装: pip install openai")
+    raise
+
+import numpy as np  # 添加numpy导入
+
+# 根据运行方式选择不同的导入方式
+if __name__ == "__main__":
+    # 作为主程序运行时，从父目录导入
+    from services.extract_layers_utils import CozeWorkflowClient, TOSUploader
+else:
+    # 作为模块导入时，使用相对导入
+    from .extract_layers_utils import CozeWorkflowClient, TOSUploader
+
+import concurrent.futures  # 添加并发处理库
+import threading  # 添加线程库
 
 # 尝试加载环境变量
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass
-
-class CozeWorkflowClient:
-    def __init__(self, api_token: str):
-        """
-        初始化Coze工作流客户端
-        
-        Args:
-            api_token: Coze API令牌
-        """
-        self.api_token = api_token
-        self.base_url = "https://api.coze.cn/v1"
-        self.headers = {
-            "Authorization": f"Bearer {api_token}",
-            "Content-Type": "application/json"
-        }
-    
-    def run_workflow(self, workflow_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        运行工作流
-        
-        Args:
-            workflow_id: 工作流ID
-            parameters: 工作流参数
-            
-        Returns:
-            响应数据
-        """
-        url = f"{self.base_url}/workflow/run"
-        payload = {
-            "workflow_id": workflow_id,
-            "parameters": parameters
-        }
-        
-        try:
-            response = requests.post(url, headers=self.headers, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result
-            else:
-                return {"error": response.text, "status_code": response.status_code}
-                
-        except requests.exceptions.RequestException as e:
-            return {"error": str(e)}
-        except json.JSONDecodeError as e:
-            return {"error": f"JSON解析错误: {e}"}
-    
-    def run_cutout_workflow(self, image_url: str) -> Dict[str, Any]:
-        """
-        运行抠图工作流
-        
-        Args:
-            image_url: 图片URL
-            
-        Returns:
-            响应数据
-        """
-        workflow_id = "7526719168868237347"
-        parameters = {
-            "input": image_url
-        }
-        
-        return self.run_workflow(workflow_id, parameters)
-    
-    def parse_workflow_result(self, result: Dict[str, Any]) -> Optional[str]:
-        """
-        解析工作流返回的结果，提取output URL
-        
-        Args:
-            result: 工作流返回的结果
-            
-        Returns:
-            解析出的output URL，失败时返回None
-        """
-        try:
-            if "error" in result:
-                return None
-            
-            if "data" not in result:
-                return None
-            
-            # 检查data字段是否为字符串（JSON字符串）
-            data = result["data"]
-            if isinstance(data, str):
-                try:
-                    data = json.loads(data)
-                except json.JSONDecodeError:
-                    return None
-            
-            if "output" not in data:
-                return None
-            
-            output_url = data["output"]
-            return output_url
-            
-        except Exception as e:
-            return None
-
-class TOSUploader:
-    def __init__(self, ak: str, sk: str, endpoint: str, region: str, bucket_name: str):
-        """
-        初始化TOS上传器
-        
-        Args:
-            ak: 访问密钥ID
-            sk: 访问密钥Secret
-            endpoint: TOS端点
-            region: 区域
-            bucket_name: 存储桶名称
-        """
-        self.ak = ak
-        self.sk = sk
-        self.endpoint = endpoint
-        self.region = region
-        self.bucket_name = bucket_name
-        
-    def upload_file_and_get_url(self, local_file_path: str) -> Optional[str]:
-        """
-        上传文件到TOS并获取预签名URL
-        
-        Args:
-            local_file_path: 本地文件路径
-            
-        Returns:
-            预签名URL，失败时返回None
-        """
-        try:
-            # 检查文件是否存在
-            if not os.path.exists(local_file_path):
-                return None
-            
-            # 从文件路径中提取文件名，并添加时间戳
-            file_basename = os.path.basename(local_file_path)
-            name_without_ext = os.path.splitext(file_basename)[0]
-            file_ext = os.path.splitext(file_basename)[1]
-            timestamp = int(time.time())
-            object_key = f"{name_without_ext}_{timestamp}{file_ext}"
-            
-            # 创建TOS客户端
-            client = tos.TosClientV2(self.ak, self.sk, self.endpoint, self.region)
-            
-            # 上传文件
-            client.put_object_from_file(self.bucket_name, object_key, local_file_path)
-            
-            # 生成下载文件的预签名URL，有效时间为3600s
-            download_url = client.pre_signed_url(
-                tos.HttpMethodType.Http_Method_Get, 
-                bucket=self.bucket_name, 
-                key=object_key, 
-                expires=3600
-            )
-            
-            return download_url.signed_url
-            
-        except tos.exceptions.TosClientError as e:
-            return None
-        except tos.exceptions.TosServerError as e:
-            return None
-        except Exception as e:
-            return None
-    
-    def download_and_save_image(self, image_url: str, original_file_path: str, save_dir: Optional[str] = None) -> Optional[str]:
-        """
-        下载图片并保存到本地
-        
-        Args:
-            image_url: 图片URL
-            original_file_path: 原始文件路径（用于生成保存文件名）
-            save_dir: 保存目录，默认为原始文件所在目录
-            
-        Returns:
-            保存的文件路径，失败时返回None
-        """
-        try:
-            # 下载图片
-            response = requests.get(image_url, timeout=30)
-            
-            if response.status_code != 200:
-                return None
-            
-            # 确定保存目录
-            if save_dir is None:
-                save_dir = os.path.dirname(original_file_path)
-            
-            # 确保保存目录存在
-            os.makedirs(save_dir, exist_ok=True)
-            
-            # 生成保存文件名
-            original_basename = os.path.basename(original_file_path)
-            name_without_ext = os.path.splitext(original_basename)[0]
-            save_filename = f"{name_without_ext}_cutout.png"
-            save_path = os.path.join(save_dir, save_filename)
-            
-            # 保存文件
-            with open(save_path, 'wb') as f:
-                f.write(response.content)
-            
-            return save_path
-            
-        except requests.exceptions.RequestException as e:
-            return None
-        except Exception as e:
-            return None
+    print("提示: 未安装python-dotenv库，将不会从.env文件加载环境变量")
 
 class LLMImageAnalyzer:
+    # 定义类常量
+    EXPAND_PX = 4  # 图层边界框扩展像素数
+    
     def __init__(self, base_url: str = "https://ark.cn-beijing.volces.com/api/v3"):
         """
         初始化LLM图片分析器
@@ -283,8 +131,45 @@ class LLMImageAnalyzer:
         Returns:
             base64编码的图片字符串
         """
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        # 使用线程ID创建唯一的临时文件名
+        thread_id = threading.get_ident()
+        timestamp = int(time.time() * 1000)
+        
+        # 使用PIL打开并处理图片，确保格式正确
+        with Image.open(image_path) as img:
+            # 检查图片尺寸
+            width, height = img.size
+
+            # 如果图片太大，调整大小以减小文件大小
+            max_dimension = 2048
+            if width > max_dimension or height > max_dimension:
+                ratio = min(max_dimension / width, max_dimension / height)
+                new_width = int(width * ratio)
+                new_height = int(height * ratio)
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+
+            # 确保图片模式正确
+            if img.mode not in ['RGB', 'RGBA']:
+                img = img.convert('RGB')
+
+            # 保存为临时JPEG文件（豆包API可能更好地支持JPEG）
+            temp_dir = os.path.join(os.path.dirname(image_path), "temp")
+            os.makedirs(temp_dir, exist_ok=True)
+            temp_file = os.path.join(temp_dir, f"temp_{thread_id}_{timestamp}.jpg")
+
+            img.save(temp_file, format='JPEG', quality=95)
+
+            # 编码为base64
+            with open(temp_file, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+                
+            # 尝试删除临时文件
+            try:
+                os.remove(temp_file)
+            except:
+                pass
+                
+            return base64_image
     
     def analyze_image_layers(self, image_path: str, prompt: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -297,8 +182,6 @@ class LLMImageAnalyzer:
         Returns:
             LLM响应的JSON数据
         """
-        print(f"🔍 开始分析图片: {image_path}")
-        
         # 默认提示词
         if prompt is None:
             prompt = """这是一张茶叶包装设计图。请检测并标注图像中所有属于以下类别的元素：
@@ -346,7 +229,6 @@ class LLMImageAnalyzer:
         # 处理图片输入
         if image_path.startswith(('http://', 'https://')):
             # 网络图片
-            print("🌐 处理网络图片...")
             content.append({
                 "type": "image_url",
                 "image_url": {
@@ -355,17 +237,13 @@ class LLMImageAnalyzer:
             })
         else:
             # 本地图片
-            print("📁 处理本地图片...")
             if not os.path.exists(image_path):
                 raise FileNotFoundError(f"图片文件不存在: {image_path}")
             
-            # 获取图片MIME类型
-            mime_type = self._get_mime_type(image_path)
-            print(f"📄 图片MIME类型: {mime_type}")
+            # 获取图片MIME类型 - 始终使用JPEG
+            mime_type = "image/jpeg"
             
-            print("🔄 编码图片为base64...")
             base64_image = self.encode_image_to_base64(image_path)
-            print(f"✅ 图片编码完成，base64长度: {len(base64_image)}")
             
             content.append({
                 "type": "image_url",
@@ -375,7 +253,6 @@ class LLMImageAnalyzer:
             })
         
         try:
-            print("🚀 发送请求到豆包VLM API...")
             # 使用OpenAI客户端发送请求
             response = self.client.chat.completions.create(
                 model="doubao-1-5-thinking-vision-pro-250428",
@@ -389,8 +266,6 @@ class LLMImageAnalyzer:
                 temperature=0.1
             )
             
-            print("✅ 豆包VLM API响应成功")
-            
             # 返回响应数据
             return {
                 "choices": [
@@ -403,7 +278,6 @@ class LLMImageAnalyzer:
             }
             
         except Exception as e:
-            print(f"❌ 豆包VLM API请求失败: {str(e)}")
             raise Exception(f"API请求失败: {str(e)}")
     
     def _get_mime_type(self, file_path: str) -> str:
@@ -416,16 +290,8 @@ class LLMImageAnalyzer:
         Returns:
             MIME类型字符串
         """
-        ext = os.path.splitext(file_path)[1].lower()
-        mime_types = {
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.bmp': 'image/bmp',
-            '.webp': 'image/webp'
-        }
-        return mime_types.get(ext, 'image/jpeg')
+        # 始终返回JPEG MIME类型，因为我们在encode_image_to_base64中已转换为JPEG
+        return 'image/jpeg'
     
     def extract_layers_from_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -466,85 +332,61 @@ class LLMImageAnalyzer:
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
-        # 创建掩码，标记需要排除的区域
+        # 获取图像尺寸
         img_width, img_height = image.size
-        mask = Image.new('L', (img_width, img_height), 255)  # 255表示保留，0表示排除
+        
+        # 创建掩码，标记需要排除的区域
+        mask = np.ones((img_height, img_width), dtype=np.uint8) * 255  # 255表示保留，0表示排除
+        
+        # 将图像转换为numpy数组以加快处理速度
+        img_array = np.array(image)
         
         # 根据图层数据标记需要排除的区域
         excluded_pixels = 0
         if "layers" in layers_data and layers_data["layers"]:
-            draw = ImageDraw.Draw(mask)
-            
             for layer in layers_data["layers"]:
                 if "position" not in layer:
                     continue
                 
                 pos = layer["position"]
                 
-                # 获取归一化坐标
-                x1_norm = pos.get("x1", 0)
-                y1_norm = pos.get("y1", 0)
-                x2_norm = pos.get("x2", 0)
-                y2_norm = pos.get("y2", 0)
-                
-                # 验证坐标范围
-                if not (0 <= x1_norm <= 1 and 0 <= y1_norm <= 1 and 0 <= x2_norm <= 1 and 0 <= y2_norm <= 1):
+                coords = normalize_to_absolute_coords(pos, img_width, img_height, self.EXPAND_PX)
+                if coords is None:
                     continue
                 
-                # 验证坐标逻辑
-                if x1_norm >= x2_norm or y1_norm >= y2_norm:
-                    continue
-                
-                # 转换为绝对坐标
-                x1 = int(x1_norm * img_width)
-                y1 = int(y1_norm * img_height)
-                x2 = int(x2_norm * img_width)
-                y2 = int(y2_norm * img_height)
+                x1, y1, x2, y2, x1_exp, y1_exp, x2_exp, y2_exp = coords
 
-                # 向外扩展像素
-                expand_px = 4
-                x1_exp = max(0, x1 - expand_px)
-                y1_exp = max(0, y1 - expand_px)
-                x2_exp = min(img_width, x2 + expand_px)
-                y2_exp = min(img_height, y2 + expand_px)
-
-                # 在掩码上标记排除区域（黑色）
-                draw.rectangle([x1_exp, y1_exp, x2_exp, y2_exp], fill=0)
+                # 在掩码上标记排除区域（设为0）
+                mask[y1_exp:y2_exp, x1_exp:x2_exp] = 0
                 excluded_pixels += (x2_exp - x1_exp) * (y2_exp - y1_exp)
         
-        # 获取所有像素的颜色和对应的掩码值
-        pixels = list(image.getdata())
-        mask_pixels = list(mask.getdata())
+        # 使用掩码筛选有效像素
+        valid_pixels = img_array[mask == 255]
         
-        # 统计颜色出现次数（只统计非排除区域）
-        color_counts = {}
-        valid_pixels = 0
-        for i, pixel in enumerate(pixels):
-            # 只统计掩码值为255（保留）的像素
-            if mask_pixels[i] == 255:
-                valid_pixels += 1
-                if pixel not in color_counts:
-                    color_counts[pixel] = 0
-                color_counts[pixel] += 1
-        
-        # 找到出现次数最多的颜色
-        if color_counts:
-            most_common_color = max(color_counts.items(), key=lambda x: x[1])
+        if len(valid_pixels) > 0:
+            # 使用numpy的unique函数统计颜色频率
+            colors, counts = np.unique(valid_pixels.reshape(-1, 3), axis=0, return_counts=True)
+            
+            # 找到出现次数最多的颜色
+            most_common_idx = np.argmax(counts)
+            most_common_color = tuple(colors[most_common_idx])
             
             # 如果最常见的颜色是白色，尝试找到第二常见的非白色颜色
-            if most_common_color[0] == (255, 255, 255):
-                non_white_colors = [(color, count) for color, count in color_counts.items() if color != (255, 255, 255)]
-                if non_white_colors:
-                    second_most_common = max(non_white_colors, key=lambda x: x[1])
+            if most_common_color == (255, 255, 255):
+                # 找出非白色颜色的索引
+                non_white_indices = np.where(~np.all(colors == [255, 255, 255], axis=1))[0]
+                if len(non_white_indices) > 0:
+                    # 从非白色颜色中找出出现次数最多的颜色
+                    non_white_counts = counts[non_white_indices]
+                    second_most_common_idx = non_white_indices[np.argmax(non_white_counts)]
                     # 如果第二常见的颜色出现次数足够多，使用它
-                    if second_most_common[1] > most_common_color[1] * 0.1:  # 至少是白色的10%
-                        most_common_color = second_most_common
+                    if counts[second_most_common_idx] > counts[most_common_idx] * 0.1:  # 至少是白色的10%
+                        most_common_color = tuple(colors[second_most_common_idx])
             
-            return most_common_color[0]
+            return most_common_color
         else:
             # 如果没有有效颜色，使用默认的浅灰色
-            most_common_color = (240, 240, 240)
-            return most_common_color
+            return (240, 240, 240)
 
     def create_background_image(self, image_path: str, layers_data: Dict[str, Any], output_path: Optional[str] = None) -> Optional[str]:
         """
@@ -573,33 +415,6 @@ class LLMImageAnalyzer:
             # 创建背景图（使用最常见颜色填充）
             img_width, img_height = original_image.size
             
-            # 调试：保存掩码图像
-            try:
-                debug_dir = os.path.join(os.path.dirname(image_path), "debug")
-                os.makedirs(debug_dir, exist_ok=True)
-                base_name = os.path.splitext(os.path.basename(image_path))[0]
-                
-                # 创建掩码用于调试
-                mask = Image.new('L', (img_width, img_height), 255)
-                if "layers" in layers_data and layers_data["layers"]:
-                    draw = ImageDraw.Draw(mask)
-                    for layer in layers_data["layers"]:
-                        if "position" not in layer:
-                            continue
-                        pos = layer["position"]
-                        x1_norm, y1_norm, x2_norm, y2_norm = pos.get("x1", 0), pos.get("y1", 0), pos.get("x2", 0), pos.get("y2", 0)
-                        if 0 <= x1_norm <= 1 and 0 <= y1_norm <= 1 and 0 <= x2_norm <= 1 and 0 <= y2_norm <= 1 and x1_norm < x2_norm and y1_norm < y2_norm:
-                            x1, y1, x2, y2 = int(x1_norm * img_width), int(y1_norm * img_height), int(x2_norm * img_width), int(y2_norm * img_height)
-                            expand_px = 4
-                            x1_exp, y1_exp = max(0, x1 - expand_px), max(0, y1 - expand_px)
-                            x2_exp, y2_exp = min(img_width, x2 + expand_px), min(img_height, y2 + expand_px)
-                            draw.rectangle([x1_exp, y1_exp, x2_exp, y2_exp], fill=0)
-                
-                mask_path = os.path.join(debug_dir, f"{base_name}_mask.png")
-                mask.save(mask_path)
-            except Exception as e:
-                pass
-            
             background_image = Image.new('RGB', (img_width, img_height), most_common_color)
             
             # 检查是否有图层数据
@@ -614,32 +429,11 @@ class LLMImageAnalyzer:
                 pos = layer["position"]
                 content = layer["content"]
                 
-                # 获取归一化坐标
-                x1_norm = pos.get("x1", 0)
-                y1_norm = pos.get("y1", 0)
-                x2_norm = pos.get("x2", 0)
-                y2_norm = pos.get("y2", 0)
-                
-                # 验证坐标范围
-                if not (0 <= x1_norm <= 1 and 0 <= y1_norm <= 1 and 0 <= x2_norm <= 1 and 0 <= y2_norm <= 1):
+                coords = normalize_to_absolute_coords(pos, img_width, img_height, self.EXPAND_PX)
+                if coords is None:
                     continue
                 
-                # 验证坐标逻辑
-                if x1_norm >= x2_norm or y1_norm >= y2_norm:
-                    continue
-                
-                # 转换为绝对坐标
-                x1 = int(x1_norm * img_width)
-                y1 = int(y1_norm * img_height)
-                x2 = int(x2_norm * img_width)
-                y2 = int(y2_norm * img_height)
-
-                # 向外扩展像素
-                expand_px = 4  # 可根据需要调整扩展像素数
-                x1_exp = max(0, x1 - expand_px)
-                y1_exp = max(0, y1 - expand_px)
-                x2_exp = min(img_width, x2 + expand_px)
-                y2_exp = min(img_height, y2 + expand_px)
+                x1, y1, x2, y2, x1_exp, y1_exp, x2_exp, y2_exp = coords
 
                 # 创建背景色区域（与背景图颜色相同）
                 background_region = Image.new('RGB', (x2_exp - x1_exp, y2_exp - y1_exp), most_common_color)
@@ -710,9 +504,12 @@ class LLMImageAnalyzer:
                 return results
             
             layer_count = len(layers_data["layers"])
-            print(f"🎯 检测到 {layer_count} 个图层，开始逐个处理...")
+            print(f"🎯 检测到 {layer_count} 个图层，开始并发处理...")
             
-            # 为每个要素保存独立图片并进行抠图
+            # 存储裁剪后的图片路径和信息
+            layer_info = []
+            
+            # 为每个要素保存独立图片
             for i, layer in enumerate(layers_data["layers"]):
                 print(f"\n--- 处理第 {i+1}/{layer_count} 个图层 ---")
                 
@@ -724,44 +521,24 @@ class LLMImageAnalyzer:
                 content = layer["content"]
                 print(f"📝 图层内容: {content}")
                 
-                # 获取归一化坐标
-                x1_norm = pos.get("x1", 0)
-                y1_norm = pos.get("y1", 0)
-                x2_norm = pos.get("x2", 0)
-                y2_norm = pos.get("y2", 0)
-                
-                print(f"📍 归一化坐标: ({x1_norm:.3f}, {y1_norm:.3f}) -> ({x2_norm:.3f}, {y2_norm:.3f})")
-                
-                # 验证坐标范围
-                if not (0 <= x1_norm <= 1 and 0 <= y1_norm <= 1 and 0 <= x2_norm <= 1 and 0 <= y2_norm <= 1):
-                    print(f"❌ 跳过：坐标超出范围")
+                coords = normalize_to_absolute_coords(pos, img_width, img_height, self.EXPAND_PX)
+                if coords is None:
+                    print(f"❌ 跳过：坐标无效")
                     continue
                 
-                # 验证坐标逻辑
-                if x1_norm >= x2_norm or y1_norm >= y2_norm:
-                    print(f"❌ 跳过：坐标逻辑错误")
-                    continue
-                
-                # 转换为绝对坐标
-                x1 = int(x1_norm * img_width)
-                y1 = int(y1_norm * img_height)
-                x2 = int(x2_norm * img_width)
-                y2 = int(y2_norm * img_height)
+                x1, y1, x2, y2, x1_exp, y1_exp, x2_exp, y2_exp = coords
                 
                 print(f"📍 绝对坐标: ({x1}, {y1}) -> ({x2}, {y2})")
-
-                # 向外扩展像素
-                expand_px = 4  # 可根据需要调整扩展像素数
-                x1_exp = max(0, x1 - expand_px)
-                y1_exp = max(0, y1 - expand_px)
-                x2_exp = min(img_width, x2 + expand_px)
-                y2_exp = min(img_height, y2 + expand_px)
-                
                 print(f"📍 扩展后坐标: ({x1_exp}, {y1_exp}) -> ({x2_exp}, {y2_exp})")
 
                 # 裁剪要素区域（使用扩展后的坐标）
                 print("✂️ 裁剪图层区域...")
                 cropped_image = image.crop((x1_exp, y1_exp, x2_exp, y2_exp))
+                
+                # 记录原始裁剪尺寸
+                original_crop_width = x2_exp - x1_exp
+                original_crop_height = y2_exp - y1_exp
+                print(f"📐 裁剪区域尺寸: {original_crop_width} x {original_crop_height}")
                 
                 # 生成输出文件名
                 # 清理内容名称，移除特殊字符
@@ -781,24 +558,79 @@ class LLMImageAnalyzer:
                 
                 print(f"📏 图层尺寸: {box_width} x {box_height}")
                 
-                # 进行抠图处理
-                print("🎨 开始抠图处理...")
-                cutout_result = self._process_cutout(output_path, content)
-                print(f"✅ 抠图处理完成: {cutout_result.get('status', 'unknown')}")
-                
-                result = {
+                # 收集图层信息，准备并发处理
+                layer_info.append({
+                    "index": i,
                     "content": content,
                     "layer_path": output_path,
                     "position": {
                         "x1": x1, "y1": y1, "x2": x2, "y2": y2,
                         "x1_exp": x1_exp, "y1_exp": y1_exp, "x2_exp": x2_exp, "y2_exp": y2_exp
                     },
-                    "size": {"width": box_width, "height": box_height},
-                    "cutout": cutout_result
+                    "size": {
+                        "width": box_width, 
+                        "height": box_height,
+                        "crop_width": original_crop_width,
+                        "crop_height": original_crop_height
+                    }
+                })
+            
+            # 创建线程锁，用于保护打印输出
+            print_lock = threading.Lock()
+            
+            # 定义并发处理函数
+            def process_layer_cutout(layer_info):
+                layer_idx = layer_info["index"]
+                content = layer_info["content"]
+                layer_path = layer_info["layer_path"]
+                
+                with print_lock:
+                    print(f"\n🔄 开始并发处理第 {layer_idx+1}/{layer_count} 个图层: {content}")
+                
+                # 进行抠图处理
+                cutout_result = self._process_cutout(layer_path, content)
+                
+                with print_lock:
+                    print(f"✅ 抠图处理完成 [{layer_idx+1}/{layer_count}]: {cutout_result.get('status', 'unknown')}")
+                
+                # 如果抠图成功，确保尺寸正确
+                if cutout_result.get('status') == 'success' and cutout_result.get('cutout_path'):
+                    self._resize_cutout_image(
+                        cutout_result['cutout_path'], 
+                        layer_info["size"]["crop_width"], 
+                        layer_info["size"]["crop_height"]
+                    )
+                
+                # 构建完整结果
+                result = {**layer_info, "cutout": cutout_result}
+                return result
+            
+            # 使用线程池并发处理抠图任务，限制最大线程数为4
+            max_workers = 4  # 限制最大线程数为4
+            print(f"\n🚀 启动并发抠图处理，共 {len(layer_info)} 个任务，最大并行数: {max_workers}")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 提交所有抠图任务
+                future_to_layer = {
+                    executor.submit(process_layer_cutout, info): info 
+                    for info in layer_info
                 }
                 
-                results.append(result)
-                print(f"✅ 第 {i+1} 个图层处理完成")
+                # 收集结果
+                for future in concurrent.futures.as_completed(future_to_layer):
+                    info = future_to_layer[future]
+                    try:
+                        result = future.result()
+                        results.append(result)
+                        with print_lock:
+                            print(f"✅ 第 {info['index']+1} 个图层 '{info['content']}' 处理完成")
+                    except Exception as e:
+                        with print_lock:
+                            print(f"❌ 第 {info['index']+1} 个图层处理失败: {str(e)}")
+                            import traceback
+                            print(f"错误详情: {traceback.format_exc()}")
+            
+            # 按原始索引排序结果
+            results.sort(key=lambda x: x["index"])
             
             print(f"\n🎉 所有图层处理完成，共处理 {len(results)} 个图层")
             return results
@@ -820,61 +652,95 @@ class LLMImageAnalyzer:
         Returns:
             抠图处理结果
         """
-        print(f"🎨 开始抠图处理: {content}")
         try:
+            # 创建线程本地临时文件名，避免多线程冲突
+            thread_id = threading.get_ident()
+            temp_suffix = f"{thread_id}_{int(time.time() * 1000)}"
+            
             # 上传文件并获取预签名URL
-            print("☁️ 上传文件到TOS云存储...")
             image_url = self.tos_uploader.upload_file_and_get_url(layer_path)
             
             if not image_url:
-                print("❌ 文件上传失败")
                 return {"status": "upload_failed", "error": "文件上传失败"}
             
-            print(f"✅ 文件上传成功，URL: {image_url[:50]}...")
-            
             # 运行抠图工作流
-            print("🔄 调用Coze抠图工作流...")
             result = self.coze_client.run_cutout_workflow(image_url=image_url)
             
             if "error" in result:
-                print(f"❌ 抠图工作流失败: {result['error']}")
                 return {"status": "workflow_failed", "error": result['error']}
             
-            print("✅ 抠图工作流执行成功")
-            
             # 解析结果并下载图片
-            print("🔍 解析工作流结果...")
             output_url = self.coze_client.parse_workflow_result(result)
             
             if not output_url:
-                print("❌ 解析结果失败")
                 return {"status": "parse_failed", "error": "解析结果失败"}
-            
-            print(f"✅ 解析成功，输出URL: {output_url[:50]}...")
             
             # 确定保存目录为 cutout
             save_dir = os.path.join(os.path.dirname(layer_path), "cutout")
             # 确保保存目录存在
             os.makedirs(save_dir, exist_ok=True)
-            print(f"📁 抠图保存目录: {save_dir}")
             
-            print("⬇️ 下载抠图结果...")
+            # 下载抠图结果
             saved_path = self.tos_uploader.download_and_save_image(output_url, layer_path, save_dir)
             
             if saved_path:
-                print(f"✅ 抠图结果保存成功: {saved_path}")
+                # 获取原始图片尺寸
+                try:
+                    original_img = Image.open(layer_path)
+                    original_width, original_height = original_img.size
+                    
+                    self._resize_cutout_image(saved_path, original_width, original_height)
+                    
+                except Exception as e:
+                    pass
+                
                 return {
                     "status": "success",
                     "cutout_path": saved_path,
                     "output_url": output_url
                 }
             else:
-                print("❌ 保存抠图结果失败")
                 return {"status": "save_failed", "error": "保存抠图结果失败"}
                 
         except Exception as e:
-            print(f"❌ 抠图处理异常: {str(e)}")
-            return {"status": "exception", "error": str(e)}
+            import traceback
+            error_details = traceback.format_exc()
+            return {"status": "exception", "error": str(e), "details": error_details}
+    
+    def _resize_cutout_image(self, cutout_path: str, target_width: int, target_height: int) -> bool:
+        """
+        调整抠图结果的尺寸
+        
+        Args:
+            cutout_path: 抠图文件路径
+            target_width: 目标宽度
+            target_height: 目标高度
+            
+        Returns:
+            调整是否成功
+        """
+        try:
+            # 检查抠图结果尺寸
+            cutout_img = Image.open(cutout_path)
+            cutout_width, cutout_height = cutout_img.size
+            
+            # 如果尺寸已匹配，无需调整
+            if cutout_width == target_width and cutout_height == target_height:
+                return True
+                
+            # 确保图像为RGBA模式以保留透明度
+            if cutout_img.mode != 'RGBA':
+                cutout_img = cutout_img.convert('RGBA')
+                
+            # 使用高质量的LANCZOS重采样方法调整尺寸
+            resized_img = cutout_img.resize((target_width, target_height), Image.LANCZOS)
+            
+            # 保存调整后的图片
+            resized_img.save(cutout_path)
+            return True
+            
+        except Exception as e:
+            return False
     
     def visualize_layers(self, image_path: str, layers_data: Dict[str, Any], output_path: Optional[str] = None) -> Optional[str]:
         """
@@ -917,25 +783,11 @@ class LLMImageAnalyzer:
                 pos = layer["position"]
                 content = layer["content"]
                 
-                # 获取归一化坐标（左上角和右下角）
-                x1_norm = pos.get("x1", 0)
-                y1_norm = pos.get("y1", 0)
-                x2_norm = pos.get("x2", 0)
-                y2_norm = pos.get("y2", 0)
-                
-                # 验证坐标范围
-                if not (0 <= x1_norm <= 1 and 0 <= y1_norm <= 1 and 0 <= x2_norm <= 1 and 0 <= y2_norm <= 1):
+                coords = normalize_to_absolute_coords(pos, img_width, img_height)
+                if coords is None:
                     continue
                 
-                # 验证坐标逻辑
-                if x1_norm >= x2_norm or y1_norm >= y2_norm:
-                    continue
-                
-                # 转换为绝对坐标
-                x1 = int(x1_norm * img_width)
-                y1 = int(y1_norm * img_height)
-                x2 = int(x2_norm * img_width)
-                y2 = int(y2_norm * img_height)
+                x1, y1, x2, y2 = coords[:4]  # 只使用基本坐标，不需要扩展坐标
                 
                 # 选择颜色
                 color = self.colors[i % len(self.colors)]
@@ -982,60 +834,131 @@ class LLMImageAnalyzer:
         except Exception as e:
             return None
 
+def normalize_to_absolute_coords(pos, img_width, img_height, expand_px=0):
+    """
+    将归一化坐标转换为绝对坐标，并可选地扩展边界框
+    
+    Args:
+        pos (dict): 包含归一化坐标 x1, y1, x2, y2 的字典
+        img_width (int): 图像宽度
+        img_height (int): 图像高度
+        expand_px (int): 边界框向外扩展的像素数，默认为0
+        
+    Returns:
+        tuple: (x1, y1, x2, y2, x1_exp, y1_exp, x2_exp, y2_exp) 绝对坐标和扩展后的坐标，如果坐标无效则返回 None
+    """
+    # 获取归一化坐标
+    x1_norm = pos.get("x1", 0)
+    y1_norm = pos.get("y1", 0)
+    x2_norm = pos.get("x2", 0)
+    y2_norm = pos.get("y2", 0)
+    
+    # 验证坐标范围
+    if not (0 <= x1_norm <= 1 and 0 <= y1_norm <= 1 and 0 <= x2_norm <= 1 and 0 <= y2_norm <= 1):
+        return None
+    
+    # 验证坐标逻辑
+    if x1_norm >= x2_norm or y1_norm >= y2_norm:
+        return None
+    
+    # 转换为绝对坐标
+    x1 = int(x1_norm * img_width)
+    y1 = int(y1_norm * img_height)
+    x2 = int(x2_norm * img_width)
+    y2 = int(y2_norm * img_height)
+    
+    # 计算扩展后的坐标
+    x1_exp = max(0, x1 - expand_px)
+    y1_exp = max(0, y1 - expand_px)
+    x2_exp = min(img_width, x2 + expand_px)
+    y2_exp = min(img_height, y2 + expand_px)
+    
+    return x1, y1, x2, y2, x1_exp, y1_exp, x2_exp, y2_exp
+
 def main():
     """
-    主函数
+    主函数 - 测试图层分析和抠图功能
+    
+    运行方法:
+    1. 从项目根目录运行: python3 -m server.services.extract_layers_service
+    2. 或者直接在当前目录运行: python3 extract_layers_service.py
     """
+    import time
+    
     # 创建分析器实例（API密钥已写死）
     analyzer = LLMImageAnalyzer()
     
     # 分析本地图片
-    local_image_path = "/Users/wangxinyue/Documents/jaaz/temp/images/original/4.png"
+    local_image_path = "/Users/wangxinyue/Documents/jaaz/server/user_data/files/im_1Rk4ZE5q.png"
     
     if os.path.exists(local_image_path):
         try:
+            print("🔍 开始分析图片...")
+            start_time = time.time()
+            
             # 分析图片
             response = analyzer.analyze_image_layers(local_image_path)
             layers = analyzer.extract_layers_from_response(response)
             
-            print("分析结果:")
-            print(json.dumps(layers, ensure_ascii=False, indent=2))
+            analysis_time = time.time() - start_time
+            print(f"✅ 图片分析完成，耗时: {analysis_time:.2f}秒")
+            print(f"🎯 检测到 {len(layers.get('layers', []))} 个图层")
             
             # 可视化结果
             if "error" not in layers:
                 # 保存每个要素为独立图片并进行抠图
+                print("\n🚀 开始并发抠图处理（最大并行数: 4）...")
+                cutout_start_time = time.time()
+                
                 results = analyzer.save_individual_layers_with_cutout(local_image_path, layers)
-                print(f"要素处理和抠图完成，共处理 {len(results)} 个要素")
+                
+                cutout_time = time.time() - cutout_start_time
+                print(f"✅ 并发抠图处理完成，耗时: {cutout_time:.2f}秒")
                 
                 # 输出处理结果统计
                 success_count = sum(1 for r in results if r["cutout"]["status"] == "success")
-                print(f"抠图成功: {success_count}/{len(results)} 个要素")
-                
-                for result in results:
-                    status_icon = "✅" if result["cutout"]["status"] == "success" else "❌"
-                    print(f"{status_icon} {result['content']}: {result['cutout']['status']}")
-                    if result["cutout"]["status"] == "success":
-                        print(f"   抠图路径: {result['cutout']['cutout_path']}")
+                print(f"📊 抠图成功: {success_count}/{len(results)} 个要素")
                 
                 # 可视化结果
+                print("\n🎨 开始创建可视化结果...")
+                vis_start_time = time.time()
+                
                 visualized_path = analyzer.visualize_layers(local_image_path, layers)
+                
+                vis_time = time.time() - vis_start_time
+                print(f"✅ 可视化完成，耗时: {vis_time:.2f}秒")
                 if visualized_path:
-                    print(f"可视化完成，结果保存在: {visualized_path}")
+                    print(f"📄 可视化结果保存在: {visualized_path}")
 
                 # 创建背景图（抠掉所有检测到的图层区域）
-                print("\n开始创建背景图...")
+                print("\n🖼️ 开始创建背景图...")
+                bg_start_time = time.time()
+                
                 background_path = analyzer.create_background_image(local_image_path, layers)
+                
+                bg_time = time.time() - bg_start_time
+                print(f"✅ 背景图创建完成，耗时: {bg_time:.2f}秒")
                 if background_path:
-                    print(f"✅ 背景图已创建，结果保存在: {background_path}")
-                else:
-                    print("❌ 背景图创建失败")
+                    print(f"📄 背景图保存在: {background_path}")
+                
+                # 总结处理时间
+                total_time = time.time() - start_time
+                print(f"\n⏱️ 总处理时间: {total_time:.2f}秒")
+                print(f"  - 图片分析: {analysis_time:.2f}秒")
+                print(f"  - 并发抠图 (最大4线程): {cutout_time:.2f}秒")
+                print(f"  - 可视化: {vis_time:.2f}秒")
+                print(f"  - 背景图创建: {bg_time:.2f}秒")
             else:
-                print("无法进行可视化和保存，因为解析失败")
+                print("❌ 无法进行可视化和保存，因为解析失败")
+                print(f"错误信息: {layers.get('error', '未知错误')}")
             
         except Exception as e:
-            print(f"分析本地图片失败: {e}")
+            print(f"❌ 分析本地图片失败: {e}")
+            import traceback
+            print(f"错误详情: {traceback.format_exc()}")
     else:
-        print(f"本地图片文件不存在: {local_image_path}")
+        print(f"❌ 本地图片文件不存在: {local_image_path}")
 
 if __name__ == "__main__":
+    # 直接运行主函数，不需要重复添加sys.path，因为已在文件开头处理
     main()

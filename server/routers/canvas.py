@@ -58,7 +58,6 @@ async def split_layers(id: str, request: Request):
         data = await request.json()
         selected_images = data.get('selectedImages', [])
         
-        print(f"=== 调试信息 ===")
         print(f"画布ID: {id}")
         print(f"选中的图片数量: {len(selected_images) if selected_images else 0}")
         

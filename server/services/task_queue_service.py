@@ -265,9 +265,15 @@ class TaskQueueService:
             print("⚠️ 图片信息缺少fileId和base64数据")
             return None
         
-        # 创建临时目录
+        # 导入 FILES_DIR 用于永久存储
+        from services.config_service import FILES_DIR
+        
+        # 创建临时目录（仅用于兼容旧代码，新代码会直接保存到 FILES_DIR）
         temp_dir = os.path.join(os.path.dirname(__file__), '../temp/canvas_layers', canvas_id)
         os.makedirs(temp_dir, exist_ok=True)
+        
+        # 确保 FILES_DIR 存在
+        os.makedirs(FILES_DIR, exist_ok=True)
         
         if base64_data:
             if base64_data.startswith('data:image'):
@@ -276,23 +282,26 @@ class TaskQueueService:
                 
                 try:
                     image_data = base64.b64decode(base64_data)
-                    temp_filename = f"temp_{file_id or 'unknown'}.png"
-                    temp_path = os.path.join(temp_dir, temp_filename)
+                    # 使用 generate_file_id 生成唯一文件名
+                    from tools.image_generators import generate_file_id
+                    new_file_id = generate_file_id()
+                    # 将图片保存到永久文件目录而不是临时目录
+                    file_path = os.path.join(FILES_DIR, f"{new_file_id}.png")
                     
-                    with open(temp_path, 'wb') as f:
+                    with open(file_path, 'wb') as f:
                         f.write(image_data)
                     
-                    if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
-                        return temp_path
+                    if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                        print(f"✅ 图片已保存到永久文件目录: {file_path}")
+                        return file_path
                     else:
-                        print(f"❌ 临时文件创建失败: {temp_path}")
+                        print(f"❌ 文件创建失败: {file_path}")
                         return None
                 except Exception as e:
                     print(f"❌ 处理base64数据失败: {e}")
                     return None
                     
             elif base64_data.startswith('/api/file/'):
-                from services.config_service import FILES_DIR
                 file_name = base64_data.split('/')[-1]
                 image_path = os.path.join(FILES_DIR, file_name)
                 if os.path.exists(image_path):
@@ -307,7 +316,6 @@ class TaskQueueService:
                     print(f"❌ 文件不存在: {base64_data}")
                     return None
         else:
-            from services.config_service import FILES_DIR
             image_path = os.path.join(FILES_DIR, file_id)
             if os.path.exists(image_path):
                 return image_path
@@ -508,6 +516,7 @@ class TaskQueueService:
         from services.websocket_state import sio
         import json
         import aiosqlite
+        import os
         
         # 获取当前画布数据
         canvas_data = await db_service.get_canvas_data(canvas_id)
@@ -537,18 +546,46 @@ class TaskQueueService:
         # 发送图层添加通知
         print(f"🔍 开始发送图层添加通知，共 {len(layer_elements)} 个图层")
         
+        # 检查文件是否存在
+        from services.config_service import FILES_DIR
+        print(f"📁 文件存储目录: {FILES_DIR}")
+        
         for i, layer_info in enumerate(layer_elements):
             try:
+                # 检查文件是否存在
+                file_id = layer_info['element']['id']
+                file_url = layer_info['file']['dataURL']
+                file_name = file_url.split('/')[-1] if '/api/file/' in file_url else None
+                file_path = os.path.join(FILES_DIR, file_name) if file_name else None
+                
+                print(f"🔍 图层 {i+1} 文件信息:")
+                print(f"   - 元素ID: {file_id}")
+                print(f"   - 文件URL: {file_url}")
+                print(f"   - 文件名: {file_name}")
+                print(f"   - 文件路径: {file_path}")
+                
+                if file_path and os.path.exists(file_path):
+                    file_size = os.path.getsize(file_path)
+                    print(f"   - 文件存在: ✅ (大小: {file_size} 字节)")
+                else:
+                    print(f"   - 文件存在: ❌ (文件不存在或路径无效)")
+                
+                # 检查元素位置和尺寸
+                element = layer_info['element']
+                print(f"   - 元素位置: x={element['x']}, y={element['y']}, width={element['width']}, height={element['height']}")
+                
                 # 直接使用sio.emit发送session_update事件
                 await sio.emit('session_update', {
                     'session_id': canvas_id,
                     'canvas_id': canvas_id,
-                    'type': 'layer_added',
+                    'type': 'layer_added',  # 使用与前端枚举一致的字符串
                     'element': layer_info['element'],
                     'file': layer_info['file'],
                     'content': layer_info['content']
                 })
-                print(f"✅ 图层 {i+1} 添加通知已发送: {layer_info['content']}")
+                
+                # 添加调试日志
+                print(f"✅ 图层 {i+1} 添加通知已发送: {layer_info['content']}, 元素ID: {layer_info['element']['id']}")
                 
             except Exception as e:
                 print(f"⚠️ 发送图层 {i+1} 添加通知失败: {e}")
