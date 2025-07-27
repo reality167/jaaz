@@ -16,6 +16,7 @@ langgraph_service.py
 - routers.websocket
 - routers.image_tools
 """
+import os
 from pydantic import BaseModel, Field
 from tools.write_plan import write_plan_tool
 from utils.http_client import HttpClient
@@ -54,6 +55,13 @@ async def langgraph_agent(messages, canvas_id, session_id, text_model, image_mod
         provider = text_model.get('provider')
         url = text_model.get('url')
         api_key = config_service.app_config.get(provider, {}).get("api_key", "")
+        
+        # 如果是volces提供商且没有设置API key，尝试从环境变量获取默认key
+        if provider == 'volces' and not api_key:
+            api_key = os.getenv('VOLCES_API_KEY', '')
+            if api_key:
+                print("使用环境变量中的默认VOLCES_API_KEY")
+        
         # TODO: Verify if max token is working
         max_tokens = text_model.get('max_tokens', 8148)
         if provider == 'ollama':
@@ -218,6 +226,13 @@ async def langgraph_multi_agent(messages, canvas_id, session_id, text_model, ima
         provider = text_model.get('provider')
         url = text_model.get('url')
         api_key = config_service.app_config.get(provider, {}).get("api_key", "")
+        
+        # 如果是volces提供商且没有设置API key，尝试从环境变量获取默认key
+        if provider == 'volces' and not api_key:
+            api_key = os.getenv('VOLCES_API_KEY', '')
+            if api_key:
+                print("使用环境变量中的默认VOLCES_API_KEY")
+        
         # TODO: Verify if max token is working
         max_tokens = text_model.get('max_tokens', 8148)
         if provider == 'ollama':

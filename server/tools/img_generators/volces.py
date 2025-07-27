@@ -26,8 +26,16 @@ class VolcesImageGenerator(ImageGenerator):
         **kwargs
     ) -> tuple[str, int, int, str]:
         try:
+            # 从配置中获取API key
             api_key = config_service.app_config.get(
                 'volces', {}).get('api_key', '')
+            
+            # 如果用户没有设置API key，尝试从环境变量获取默认key
+            if not api_key:
+                api_key = os.getenv('VOLCES_API_KEY', '')
+                if api_key:
+                    print("使用环境变量中的默认VOLCES_API_KEY")
+            
             url = config_service.app_config.get('volces', {}).get('url', '')
             model = model.replace('volces/', '')
 

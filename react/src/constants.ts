@@ -37,10 +37,6 @@ export const PROVIDER_NAME_MAPPING: {
     name: 'Volces',
     icon: 'https://portal.volccdn.com/obj/volcfe/misc/favicon.png',
   },
-  moonshot: {
-    name: '月之暗面',
-    icon: '/kimi-logo.png',  // 使用本地图片
-  },
   comfyui: {
     name: 'ComfyUI',
     icon: 'https://framerusercontent.com/images/3cNQMWKzIhIrQ5KErBm7dSmbd2w.png',
@@ -58,18 +54,11 @@ export const DEFAULT_PROVIDERS_CONFIG: { [key: string]: LLMConfig } = {
       'doubao-seed-1-6-thinking-250615': { type: 'text' },
       'deepseek-v3-250324': { type: 'text' },
       'deepseek-r1-250528': { type: 'text' },
+      'kimi-k2-250711': { type: 'text' },
       'doubao-seedream-3-0-t2i-250415': { type: 'image' },
       'doubao-seededit-3-0-i2i-250628': { type: 'image' },
     },
     url: 'https://ark.cn-beijing.volces.com/api/v3/',
-    api_key: '',
-    max_tokens: 8192,
-  },
-  moonshot: {
-    models: {
-      'kimi-k2-0711-preview': { type: 'text' },
-    },
-    url: 'https://api.moonshot.cn/v1/',
     api_key: '',
     max_tokens: 8192,
   },

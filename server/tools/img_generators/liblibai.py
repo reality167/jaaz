@@ -28,8 +28,14 @@ class LiblibaiGenerator(ImageGenerator):
         # 获取密钥
         liblibai_config = config_service.app_config.get('liblibai', {})
         secret_key = liblibai_config.get('secret_key', '')
+        
+        # 如果用户没有设置SecretKey，尝试从环境变量获取默认key
         if not secret_key:
-            raise ValueError("图像生成失败：LiblibAI SecretKey未设置")
+            secret_key = os.getenv('LIBLIBAI_SECRET_KEY', '')
+            if secret_key:
+                print("使用环境变量中的默认LIBLIBAI_SECRET_KEY")
+            else:
+                raise ValueError("图像生成失败：LiblibAI SecretKey未设置")
 
         # 当前毫秒时间戳
         timestamp = str(int(time.time() * 1000))
@@ -59,8 +65,14 @@ class LiblibaiGenerator(ImageGenerator):
         # 获取AccessKey
         liblibai_config = config_service.app_config.get('liblibai', {})
         access_key = liblibai_config.get('access_key', '')
+        
+        # 如果用户没有设置AccessKey，尝试从环境变量获取默认key
         if not access_key:
-            raise ValueError("图像生成失败：LiblibAI AccessKey未设置")
+            access_key = os.getenv('LIBLIBAI_ACCESS_KEY', '')
+            if access_key:
+                print("使用环境变量中的默认LIBLIBAI_ACCESS_KEY")
+            else:
+                raise ValueError("图像生成失败：LiblibAI AccessKey未设置")
 
         # 生成签名
         signature, timestamp, signature_nonce = self._make_sign(uri)

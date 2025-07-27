@@ -18,11 +18,18 @@ class ReplicateGenerator(ImageGenerator):
         **kwargs
     ) -> tuple[str, int, int, str]:
         try:
+            # 从配置中获取API key
             api_key = config_service.app_config.get(
                 'replicate', {}).get('api_key', '')
+            
+            # 如果用户没有设置API key，尝试从环境变量获取默认key
             if not api_key:
-                raise ValueError(
-                    "Image generation failed: Replicate API key is not set")
+                api_key = os.getenv('REPLICATE_API_KEY', '')
+                if api_key:
+                    print("使用环境变量中的默认REPLICATE_API_KEY")
+                else:
+                    raise ValueError(
+                        "Image generation failed: Replicate API key is not set")
 
             url = f"https://api.replicate.com/v1/models/{model}/predictions"
             headers = {

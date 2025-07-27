@@ -66,6 +66,7 @@ const PROVIDER_OPTIONS = [
         'doubao-seed-1-6-flash-250615': { type: 'text' },
         'deepseek-v3-250324': { type: 'text' },
         'deepseek-r1-250528': { type: 'text' },
+        'kimi-k2-250711': { type: 'text' },
         'doubao-seedream-3-0-t2i-250415': { type: 'image' },
         'doubao-seededit-3-0-i2i-250628': { type: 'image' },
       },
@@ -81,7 +82,6 @@ const PROVIDER_OPTIONS = [
     label: '智谱 AI (GLM)',
     data: { apiUrl: 'https://open.bigmodel.cn/api/paas/v4/' },
   },
-  // 移除月之暗面选项，因为它现在是默认提供商
 ]
 
 export default function AddProviderDialog({
