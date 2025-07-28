@@ -1,5 +1,7 @@
 import LanguageSwitcher from '@/components/common/LanguageSwitcher'
 import { NotificationPanel } from '@/components/common/NotificationPanel'
+import SystemPromptButton from '@/components/common/SystemPromptButton'
+import TeaPromptButton from '@/components/common/TeaPromptButton'
 import ThemeButton from '@/components/theme/ThemeButton'
 import { Button } from '@/components/ui/button'
 import { LOGO_URL } from '@/constants'
@@ -135,6 +137,8 @@ function HomeHeader() {
         </div>
         <div className="flex items-center gap-2">
           <NotificationPanel />
+          <SystemPromptButton />
+          <TeaPromptButton />
           <Button
             size={'sm'}
             variant="ghost"

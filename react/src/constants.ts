@@ -147,3 +147,24 @@ Discreet modular grid lines and data glyphs fade into matte charcoal background,
 
 Step 2. Call generate_image tool to generate the image based on the plan immediately, use a detailed and professional image prompt according to your design strategy plan, no need to ask for user's approval. 
 `
+
+export const TEA_PACKAGING_PROMPT = `设计需求：为一家茶叶厂家设计包装平面图
+
+项目信息：
+公司名：\${formData.companyName}
+品名：\${formData.productName}
+尺寸：\${formData.dimensions}
+风格：\${formData.style}
+底色：\${formData.backgroundColor}
+文字介绍：\${formData.description}
+设计图数量：\${formData.imageCount}张
+
+设计要求：
+1. 这是一个茶叶产品的包装平面图设计
+2. 需要体现茶叶产品的特色和品质
+3. 包装设计要符合茶叶行业的审美标准
+4. 包含产品名称、品牌标识、产品信息等必要元素
+5. 设计风格要符合茶叶产品的定位和目标消费群体
+6. 请生成\${formData.imageCount}张不同的设计方案供选择
+
+请根据以上信息生成专业的茶叶包装平面图设计。`

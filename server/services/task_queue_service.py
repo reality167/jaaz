@@ -265,14 +265,7 @@ class TaskQueueService:
             print("⚠️ 图片信息缺少fileId和base64数据")
             return None
         
-        # 导入 FILES_DIR 用于永久存储
         from services.config_service import FILES_DIR
-        
-        # 创建临时目录（仅用于兼容旧代码，新代码会直接保存到 FILES_DIR）
-        temp_dir = os.path.join(os.path.dirname(__file__), '../temp/canvas_layers', canvas_id)
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # 确保 FILES_DIR 存在
         os.makedirs(FILES_DIR, exist_ok=True)
         
         if base64_data:

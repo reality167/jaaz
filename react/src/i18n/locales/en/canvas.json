@@ -13,6 +13,10 @@
   "saveSnapshot": "Save Snapshot",
   "loadSnapshot": "Load Snapshot",
   "saved": "Saved ✅",
+  "resize_image": "Resize Image",
+  "width": "Width",
+  "height": "Height",
+  "keep_aspect_ratio": "Keep Aspect Ratio",
   "messages": {
     "canvasRenamed": "Canvas renamed successfully",
     "canvasDeleted": "Canvas deleted successfully",

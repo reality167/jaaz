@@ -3,7 +3,7 @@ import ChatTextarea from '@/components/chat/ChatTextarea'
 import HomeHeader from '@/components/home/HomeHeader'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useConfigs } from '@/contexts/configs'
-import { DEFAULT_SYSTEM_PROMPT } from '@/constants'
+import { DEFAULT_SYSTEM_PROMPT, TEA_PACKAGING_PROMPT } from '@/constants'
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { motion } from 'motion/react'
@@ -56,27 +56,18 @@ function Home() {
       return
     }
 
-    // 构建包含表单信息的提示词，强调茶叶包装设计
-    const formPrompt = `设计需求：为一家茶叶厂家设计包装平面图
-
-项目信息：
-公司名：${formData.companyName}
-品名：${formData.productName}
-尺寸：${formData.dimensions}
-风格：${formData.style}
-底色：${formData.backgroundColor}
-文字介绍：${formData.description}
-设计图数量：${formData.imageCount}张
-
-设计要求：
-1. 这是一个茶叶产品的包装平面图设计
-2. 需要体现茶叶产品的特色和品质
-3. 包装设计要符合茶叶行业的审美标准
-4. 包含产品名称、品牌标识、产品信息等必要元素
-5. 设计风格要符合茶叶产品的定位和目标消费群体
-6. 请生成${formData.imageCount}张不同的设计方案供选择
-
-请根据以上信息生成专业的茶叶包装平面图设计。`
+    // 使用localStorage中存储的提示词，如果没有则使用默认值
+    const teaPrompt = localStorage.getItem('tea_packaging_prompt') || TEA_PACKAGING_PROMPT
+    
+    // 使用提示词并替换变量
+    const formPrompt = teaPrompt
+      .replace(/\${formData.companyName}/g, formData.companyName)
+      .replace(/\${formData.productName}/g, formData.productName)
+      .replace(/\${formData.dimensions}/g, formData.dimensions)
+      .replace(/\${formData.style}/g, formData.style)
+      .replace(/\${formData.backgroundColor}/g, formData.backgroundColor)
+      .replace(/\${formData.description}/g, formData.description)
+      .replace(/\${formData.imageCount}/g, String(formData.imageCount))
 
     // 创建包含表单信息的消息
     const messages = [

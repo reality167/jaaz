@@ -13,6 +13,10 @@
   "saveSnapshot": "保存快照",
   "loadSnapshot": "加载快照",
   "saved": "已保存 ✅",
+  "resize_image": "调整图像尺寸",
+  "width": "宽度",
+  "height": "高度",
+  "keep_aspect_ratio": "保持宽高比",
   "messages": {
     "canvasRenamed": "画布重命名成功",
     "canvasDeleted": "画布删除成功",
