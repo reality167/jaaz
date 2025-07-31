@@ -5,6 +5,10 @@ from services.db_service import db_service
 from services.websocket_state import sio
 import asyncio
 import json
+import logging
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/canvas")
 
@@ -52,17 +56,17 @@ async def split_layers(id: str, request: Request):
     接收画布ID，提交异步任务，立即返回任务ID
     """
     try:
-        print(f"\n=== 开始处理画布 {id} 的图层拆分请求 ===")
+        logger.info(f"\n=== 开始处理画布 {id} 的图层拆分请求 ===")
         
         # 获取请求数据
         data = await request.json()
         selected_images = data.get('selectedImages', [])
         
-        print(f"画布ID: {id}")
-        print(f"选中的图片数量: {len(selected_images) if selected_images else 0}")
+        logger.info(f"画布ID: {id}")
+        logger.info(f"选中的图片数量: {len(selected_images) if selected_images else 0}")
         
         if not selected_images:
-            print("❌ 未选择任何图片")
+            logger.error("❌ 未选择任何图片")
             raise Exception("未选择任何图片")
         
         # 提交异步任务
@@ -88,9 +92,8 @@ async def split_layers(id: str, request: Request):
         }
         
     except Exception as e:
-        print(f"❌ 提交图层拆分任务失败: {str(e)}")
-        import traceback
-        print(f"错误详情: {traceback.format_exc()}")
+        logger.error(f"❌ 提交图层拆分任务失败: {str(e)}")
+        logger.exception("图层拆分任务失败详细错误信息:")
         
         error_message = {
             "type": "split_layers_error",

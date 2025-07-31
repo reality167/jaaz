@@ -1,6 +1,6 @@
 {
   "name": "Artbox",
-  "version": "1.0.14",
+  "version": "0.1.0",
   "description": "AI design agent local desktop app",
   "author": "weixuanfu",
   "main": "electron/main.js",

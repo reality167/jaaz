@@ -6,62 +6,36 @@ import time
 import requests
 import sys
 import os.path as path
+import logging
 
-# 添加相对导入支持
+# 配置日志
+logger = logging.getLogger(__name__)
+
 # 如果作为主程序运行，添加父目录到sys.path
 if __name__ == "__main__":
-    # 获取当前文件的目录
     current_dir = path.dirname(path.abspath(__file__))
-    # 获取父目录（services的父目录）
     parent_dir = path.dirname(current_dir)
-    # 将父目录添加到Python路径
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
-        print(f"已将父目录添加到Python路径: {parent_dir}")
+        logger.info(f"已将父目录添加到Python路径: {parent_dir}")
 
-# 尝试导入必要的库
-try:
-    import tos
-except ImportError:
-    print("警告: 无法导入tos库，请安装: pip install tos")
-    # 创建一个假的tos模块，避免导入错误
-    class FakeTos:
-        class exceptions:
-            class TosClientError(Exception): pass
-            class TosServerError(Exception): pass
-    tos = FakeTos()
+# 导入必要的库
+import tos
+from PIL import Image, ImageDraw, ImageFont
+from openai import OpenAI
+import numpy as np
+import concurrent.futures
+import threading
+from dotenv import load_dotenv
 
-try:
-    from PIL import Image, ImageDraw, ImageFont
-except ImportError:
-    print("警告: 无法导入PIL库，请安装: pip install pillow")
-    raise
-
-try:
-    from openai import OpenAI
-except ImportError:
-    print("警告: 无法导入openai库，请安装: pip install openai")
-    raise
-
-import numpy as np  # 添加numpy导入
+# 加载环境变量
+load_dotenv()
 
 # 根据运行方式选择不同的导入方式
 if __name__ == "__main__":
-    # 作为主程序运行时，从父目录导入
     from services.extract_layers_utils import CozeWorkflowClient, TOSUploader
 else:
-    # 作为模块导入时，使用相对导入
     from .extract_layers_utils import CozeWorkflowClient, TOSUploader
-
-import concurrent.futures  # 添加并发处理库
-import threading  # 添加线程库
-
-# 尝试加载环境变量
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    print("提示: 未安装python-dotenv库，将不会从.env文件加载环境变量")
 
 class LLMImageAnalyzer:
     # 定义类常量
@@ -74,8 +48,10 @@ class LLMImageAnalyzer:
         Args:
             base_url: API基础URL
         """
-        # 直接使用写死的API密钥
-        api_key = "4cdaf093-d604-4407-a979-a978d3090afa"
+        # 从环境变量获取API密钥
+        api_key = os.getenv("VOLCES_API_KEY", "")
+        if not api_key:
+            raise ValueError("VOLCES_API_KEY 环境变量未设置")
         
         # 初始化OpenAI客户端
         self.client = OpenAI(
@@ -114,9 +90,9 @@ class LLMImageAnalyzer:
         
         # 验证必要的环境变量
         if not api_token:
-            print("⚠️  警告: COZE_API_TOKEN 环境变量未设置")
+            logger.warning("⚠️  警告: COZE_API_TOKEN 环境变量未设置")
         if not ak or not sk:
-            print("⚠️  警告: VOLCENGINE_ACCESS_KEY 或 VOLCENGINE_SECRET_KEY 环境变量未设置")
+            logger.warning("⚠️  警告: VOLCENGINE_ACCESS_KEY 或 VOLCENGINE_SECRET_KEY 环境变量未设置")
         
         self.coze_client = CozeWorkflowClient(api_token)
         self.tos_uploader = TOSUploader(ak, sk, endpoint, region, bucket_name)
@@ -474,15 +450,15 @@ class LLMImageAnalyzer:
         Returns:
             处理结果列表，包含每个要素的保存路径和抠图结果
         """
-        print(f"🔄 开始保存图层要素并进行抠图处理...")
+        logger.info(f"🔄 开始保存图层要素并进行抠图处理...")
         results = []
         
         try:
             # 打开原始图片
-            print(f"📖 打开原始图片: {image_path}")
+            logger.info(f"📖 打开原始图片: {image_path}")
             image = Image.open(image_path)
             img_width, img_height = image.size
-            print(f"📐 图片尺寸: {img_width} x {img_height}")
+            logger.info(f"📐 图片尺寸: {img_width} x {img_height}")
             
             # 确定输出目录
             if output_dir is None:
@@ -491,7 +467,7 @@ class LLMImageAnalyzer:
                 # 创建 layer 子目录
                 output_dir = os.path.join(original_dir, "layer")
             
-            print(f"📁 输出目录: {output_dir}")
+            logger.info(f"📁 输出目录: {output_dir}")
             # 创建输出目录（如果不存在）
             os.makedirs(output_dir, exist_ok=True)
             
@@ -500,45 +476,45 @@ class LLMImageAnalyzer:
             
             # 检查是否有图层数据
             if "layers" not in layers_data or not layers_data["layers"]:
-                print("⚠️ 没有检测到图层数据")
+                logger.warning("⚠️ 没有检测到图层数据")
                 return results
             
             layer_count = len(layers_data["layers"])
-            print(f"🎯 检测到 {layer_count} 个图层，开始并发处理...")
+            logger.info(f"🎯 检测到 {layer_count} 个图层，开始并发处理...")
             
             # 存储裁剪后的图片路径和信息
             layer_info = []
             
             # 为每个要素保存独立图片
             for i, layer in enumerate(layers_data["layers"]):
-                print(f"\n--- 处理第 {i+1}/{layer_count} 个图层 ---")
+                logger.info(f"\n--- 处理第 {i+1}/{layer_count} 个图层 ---")
                 
                 if "position" not in layer or "content" not in layer:
-                    print(f"⚠️ 跳过：图层缺少position或content信息")
+                    logger.warning(f"⚠️ 跳过：图层缺少position或content信息")
                     continue
                 
                 pos = layer["position"]
                 content = layer["content"]
-                print(f"📝 图层内容: {content}")
+                logger.info(f"📝 图层内容: {content}")
                 
                 coords = normalize_to_absolute_coords(pos, img_width, img_height, self.EXPAND_PX)
                 if coords is None:
-                    print(f"❌ 跳过：坐标无效")
+                    logger.warning(f"❌ 跳过：坐标无效")
                     continue
                 
                 x1, y1, x2, y2, x1_exp, y1_exp, x2_exp, y2_exp = coords
                 
-                print(f"📍 绝对坐标: ({x1}, {y1}) -> ({x2}, {y2})")
-                print(f"📍 扩展后坐标: ({x1_exp}, {y1_exp}) -> ({x2_exp}, {y2_exp})")
+                logger.debug(f"📍 绝对坐标: ({x1}, {y1}) -> ({x2}, {y2})")
+                logger.debug(f"📍 扩展后坐标: ({x1_exp}, {y1_exp}) -> ({x2_exp}, {y2_exp})")
 
                 # 裁剪要素区域（使用扩展后的坐标）
-                print("✂️ 裁剪图层区域...")
+                logger.info("✂️ 裁剪图层区域...")
                 cropped_image = image.crop((x1_exp, y1_exp, x2_exp, y2_exp))
                 
                 # 记录原始裁剪尺寸
                 original_crop_width = x2_exp - x1_exp
                 original_crop_height = y2_exp - y1_exp
-                print(f"📐 裁剪区域尺寸: {original_crop_width} x {original_crop_height}")
+                logger.debug(f"📐 裁剪区域尺寸: {original_crop_width} x {original_crop_height}")
                 
                 # 生成输出文件名
                 # 清理内容名称，移除特殊字符
@@ -548,7 +524,7 @@ class LLMImageAnalyzer:
                 output_filename = f"{base_name}_{safe_content}_{i+1}.png"
                 output_path = os.path.join(output_dir, output_filename)
                 
-                print(f"💾 保存图层图片: {output_path}")
+                logger.info(f"💾 保存图层图片: {output_path}")
                 # 保存裁剪后的图片
                 cropped_image.save(output_path)
                 
@@ -556,7 +532,7 @@ class LLMImageAnalyzer:
                 box_width = x2 - x1
                 box_height = y2 - y1
                 
-                print(f"📏 图层尺寸: {box_width} x {box_height}")
+                logger.debug(f"📏 图层尺寸: {box_width} x {box_height}")
                 
                 # 收集图层信息，准备并发处理
                 layer_info.append({
@@ -585,13 +561,13 @@ class LLMImageAnalyzer:
                 layer_path = layer_info["layer_path"]
                 
                 with print_lock:
-                    print(f"\n🔄 开始并发处理第 {layer_idx+1}/{layer_count} 个图层: {content}")
+                    logger.info(f"\n🔄 开始并发处理第 {layer_idx+1}/{layer_count} 个图层: {content}")
                 
                 # 进行抠图处理
                 cutout_result = self._process_cutout(layer_path, content)
                 
                 with print_lock:
-                    print(f"✅ 抠图处理完成 [{layer_idx+1}/{layer_count}]: {cutout_result.get('status', 'unknown')}")
+                    logger.info(f"✅ 抠图处理完成 [{layer_idx+1}/{layer_count}]: {cutout_result.get('status', 'unknown')}")
                 
                 # 如果抠图成功，确保尺寸正确
                 if cutout_result.get('status') == 'success' and cutout_result.get('cutout_path'):
@@ -607,7 +583,7 @@ class LLMImageAnalyzer:
             
             # 使用线程池并发处理抠图任务，限制最大线程数为4
             max_workers = 4  # 限制最大线程数为4
-            print(f"\n🚀 启动并发抠图处理，共 {len(layer_info)} 个任务，最大并行数: {max_workers}")
+            logger.info(f"\n🚀 启动并发抠图处理，共 {len(layer_info)} 个任务，最大并行数: {max_workers}")
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # 提交所有抠图任务
                 future_to_layer = {
@@ -622,23 +598,21 @@ class LLMImageAnalyzer:
                         result = future.result()
                         results.append(result)
                         with print_lock:
-                            print(f"✅ 第 {info['index']+1} 个图层 '{info['content']}' 处理完成")
+                            logger.info(f"✅ 第 {info['index']+1} 个图层 '{info['content']}' 处理完成")
                     except Exception as e:
                         with print_lock:
-                            print(f"❌ 第 {info['index']+1} 个图层处理失败: {str(e)}")
-                            import traceback
-                            print(f"错误详情: {traceback.format_exc()}")
+                            logger.error(f"❌ 第 {info['index']+1} 个图层处理失败: {str(e)}")
+                            logger.exception("图层处理失败详细错误信息:")
             
             # 按原始索引排序结果
             results.sort(key=lambda x: x["index"])
             
-            print(f"\n🎉 所有图层处理完成，共处理 {len(results)} 个图层")
+            logger.info(f"\n🎉 所有图层处理完成，共处理 {len(results)} 个图层")
             return results
             
         except Exception as e:
-            print(f"❌ 图层处理过程中发生错误: {str(e)}")
-            import traceback
-            print(f"错误详情: {traceback.format_exc()}")
+            logger.error(f"❌ 图层处理过程中发生错误: {str(e)}")
+            logger.exception("图层处理过程中发生异常:")
             return results
     
     def _process_cutout(self, layer_path: str, content: str) -> Dict[str, Any]:
@@ -885,7 +859,7 @@ def main():
     """
     import time
     
-    # 创建分析器实例（API密钥已写死）
+    # 创建分析器实例
     analyzer = LLMImageAnalyzer()
     
     # 分析本地图片
@@ -893,7 +867,7 @@ def main():
     
     if os.path.exists(local_image_path):
         try:
-            print("🔍 开始分析图片...")
+            logger.info("🔍 开始分析图片...")
             start_time = time.time()
             
             # 分析图片
@@ -901,63 +875,62 @@ def main():
             layers = analyzer.extract_layers_from_response(response)
             
             analysis_time = time.time() - start_time
-            print(f"✅ 图片分析完成，耗时: {analysis_time:.2f}秒")
-            print(f"🎯 检测到 {len(layers.get('layers', []))} 个图层")
+            logger.info(f"✅ 图片分析完成，耗时: {analysis_time:.2f}秒")
+            logger.info(f"🎯 检测到 {len(layers.get('layers', []))} 个图层")
             
             # 可视化结果
             if "error" not in layers:
                 # 保存每个要素为独立图片并进行抠图
-                print("\n🚀 开始并发抠图处理（最大并行数: 4）...")
+                logger.info("\n🚀 开始并发抠图处理（最大并行数: 4）...")
                 cutout_start_time = time.time()
                 
                 results = analyzer.save_individual_layers_with_cutout(local_image_path, layers)
                 
                 cutout_time = time.time() - cutout_start_time
-                print(f"✅ 并发抠图处理完成，耗时: {cutout_time:.2f}秒")
+                logger.info(f"✅ 并发抠图处理完成，耗时: {cutout_time:.2f}秒")
                 
                 # 输出处理结果统计
                 success_count = sum(1 for r in results if r["cutout"]["status"] == "success")
-                print(f"📊 抠图成功: {success_count}/{len(results)} 个要素")
+                logger.info(f"📊 抠图成功: {success_count}/{len(results)} 个要素")
                 
                 # 可视化结果
-                print("\n🎨 开始创建可视化结果...")
+                logger.info("\n🎨 开始创建可视化结果...")
                 vis_start_time = time.time()
                 
                 visualized_path = analyzer.visualize_layers(local_image_path, layers)
                 
                 vis_time = time.time() - vis_start_time
-                print(f"✅ 可视化完成，耗时: {vis_time:.2f}秒")
+                logger.info(f"✅ 可视化完成，耗时: {vis_time:.2f}秒")
                 if visualized_path:
-                    print(f"📄 可视化结果保存在: {visualized_path}")
+                    logger.info(f"📄 可视化结果保存在: {visualized_path}")
 
                 # 创建背景图（抠掉所有检测到的图层区域）
-                print("\n🖼️ 开始创建背景图...")
+                logger.info("\n🖼️ 开始创建背景图...")
                 bg_start_time = time.time()
                 
                 background_path = analyzer.create_background_image(local_image_path, layers)
                 
                 bg_time = time.time() - bg_start_time
-                print(f"✅ 背景图创建完成，耗时: {bg_time:.2f}秒")
+                logger.info(f"✅ 背景图创建完成，耗时: {bg_time:.2f}秒")
                 if background_path:
-                    print(f"📄 背景图保存在: {background_path}")
+                    logger.info(f"📄 背景图保存在: {background_path}")
                 
                 # 总结处理时间
                 total_time = time.time() - start_time
-                print(f"\n⏱️ 总处理时间: {total_time:.2f}秒")
-                print(f"  - 图片分析: {analysis_time:.2f}秒")
-                print(f"  - 并发抠图 (最大4线程): {cutout_time:.2f}秒")
-                print(f"  - 可视化: {vis_time:.2f}秒")
-                print(f"  - 背景图创建: {bg_time:.2f}秒")
+                logger.info(f"\n⏱️ 总处理时间: {total_time:.2f}秒")
+                logger.info(f"  - 图片分析: {analysis_time:.2f}秒")
+                logger.info(f"  - 并发抠图 (最大4线程): {cutout_time:.2f}秒")
+                logger.info(f"  - 可视化: {vis_time:.2f}秒")
+                logger.info(f"  - 背景图创建: {bg_time:.2f}秒")
             else:
-                print("❌ 无法进行可视化和保存，因为解析失败")
-                print(f"错误信息: {layers.get('error', '未知错误')}")
+                logger.error("❌ 无法进行可视化和保存，因为解析失败")
+                logger.error(f"错误信息: {layers.get('error', '未知错误')}")
             
         except Exception as e:
-            print(f"❌ 分析本地图片失败: {e}")
-            import traceback
-            print(f"错误详情: {traceback.format_exc()}")
+            logger.error(f"❌ 分析本地图片失败: {e}")
+            logger.exception("分析本地图片失败详细错误信息:")
     else:
-        print(f"❌ 本地图片文件不存在: {local_image_path}")
+        logger.error(f"❌ 本地图片文件不存在: {local_image_path}")
 
 if __name__ == "__main__":
     # 直接运行主函数，不需要重复添加sys.path，因为已在文件开头处理

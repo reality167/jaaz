@@ -1,4 +1,4 @@
-Write-Host "开始构建Jaaz Windows版本..." -ForegroundColor Green
+Write-Host "开始构建Artbox Windows版本..." -ForegroundColor Green
 
 Write-Host "1. 安装根目录依赖..." -ForegroundColor Yellow
 npm install

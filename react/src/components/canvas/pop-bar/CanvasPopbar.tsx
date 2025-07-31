@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { Layers, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { useParams } from '@tanstack/react-router'
-import { dataURLToFile } from '@/lib/utils'
+import { dataURLToFile } from '@/utils/imageUtils'
 import { useMutation } from '@tanstack/react-query'
 
 type CanvasPopbarProps = {

@@ -27,5 +27,5 @@ echo "🔨 4. 打包Mac应用..."
 npm run build:mac
 
 echo "✅ 构建完成！请查看dist目录中的安装文件："
-echo "   - Jaaz-1.0.14.dmg (DMG安装包)"
-echo "   - Jaaz-1.0.14-mac.zip (ZIP压缩包)" 
+echo "   - Artbox-0.1.0.dmg (DMG安装包)"
+echo "   - Artbox-0.1.0-mac.zip (ZIP压缩包)" 

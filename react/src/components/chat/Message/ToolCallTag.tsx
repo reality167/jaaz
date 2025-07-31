@@ -5,8 +5,6 @@ import { ToolCall } from '@/types/types'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Markdown from 'react-markdown'
-import MultiChoicePrompt from '../MultiChoicePrompt'
-import SingleChoicePrompt from '../SingleChoicePrompt'
 import { useEffect, useState } from 'react'
 import { eventBus, TEvents } from '@/lib/event'
 import WritePlanToolCall from './WritePlanToolcall'
@@ -24,12 +22,6 @@ const ToolCallTag: React.FC<ToolCallTagProps> = ({
 }) => {
   const { name, arguments: inputs } = toolCall.function
 
-  if (name == 'prompt_user_multi_choice') {
-    return <MultiChoicePrompt />
-  }
-  if (name == 'prompt_user_single_choice') {
-    return <SingleChoicePrompt />
-  }
   if (name == 'write_plan') {
     return <WritePlanToolCall args={inputs} />
   }

@@ -4,7 +4,12 @@ import time
 from typing import Dict, Any, Optional, Callable
 from enum import Enum
 import traceback
+import os
 import json
+import logging
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 class TaskStatus(Enum):
     PENDING = "pending"
@@ -60,20 +65,24 @@ class TaskQueueService:
             worker = asyncio.create_task(self._worker(f"worker-{i}"))
             self.workers.append(worker)
         
-        print(f"✅ 任务队列服务已启动，工作线程数: {self.max_workers}")
+        logger.info(f"✅ 任务队列服务已启动，工作线程数: {self.max_workers}")
     
     async def stop(self):
         """停止任务队列服务"""
         self.running = False
         
-        # 等待所有工作线程完成
-        for worker in self.workers:
-            worker.cancel()
+        # 向每个工作线程发送停止信号
+        for _ in range(len(self.workers)):
+            await self.task_queue.put(None)
         
+        # 等待所有任务处理完成
+        await self.task_queue.join()
+        
+        # 等待所有工作线程完成
         await asyncio.gather(*self.workers, return_exceptions=True)
         self.workers.clear()
         
-        print("🛑 任务队列服务已停止")
+        logger.info("🛑 任务队列服务已停止")
     
     def _get_canvas_lock(self, canvas_id: str) -> asyncio.Lock:
         """获取画布锁，确保同一画布的并发安全"""
@@ -83,26 +92,29 @@ class TaskQueueService:
     
     async def _worker(self, worker_name: str):
         """工作线程函数"""
-        print(f" 工作线程 {worker_name} 已启动")
+        logger.info(f"工作线程 {worker_name} 已启动")
         
         while self.running:
             try:
-                # 从队列中获取任务
-                task = await asyncio.wait_for(self.task_queue.get(), timeout=1.0)
+                # 从队列中获取任务（阻塞式等待，不设置超时）
+                task = await self.task_queue.get()
                 
+                # 标记任务已完成处理，这样queue.join()可以正常工作
+                self.task_queue.task_done()
+                
+                # 如果收到None，表示需要停止工作线程
                 if task is None:
-                    continue
+                    logger.info(f"工作线程 {worker_name} 收到停止信号")
+                    break
                 
-                print(f" {worker_name} 开始处理任务: {task.task_id}")
+                logger.info(f"{worker_name} 开始处理任务: {task.task_id}")
                 await self._process_task(task)
                 
-            except asyncio.TimeoutError:
-                continue
             except Exception as e:
-                print(f"❌ 工作线程 {worker_name} 发生错误: {e}")
-                traceback.print_exc()
+                logger.error(f"❌ 工作线程 {worker_name} 发生错误: {e}")
+                logger.exception("详细错误信息:")
         
-        print(f" 工作线程 {worker_name} 已停止")
+        logger.info(f"工作线程 {worker_name} 已停止")
     
     async def _process_task(self, task: AsyncTask):
         """处理具体任务"""
@@ -119,8 +131,8 @@ class TaskQueueService:
         except Exception as e:
             task.status = TaskStatus.FAILED
             task.error = str(e)
-            print(f"❌ 任务 {task.task_id} 处理失败: {e}")
-            traceback.print_exc()
+            logger.error(f"❌ 任务 {task.task_id} 处理失败: {e}")
+            logger.exception("任务处理详细错误信息:")
         finally:
             task.completed_at = time.time()
             task.progress.update(task.progress.total_steps, "任务完成")
@@ -131,9 +143,8 @@ class TaskQueueService:
         from services.db_service import db_service
         from services.websocket_service import broadcast_session_update
         from tools.image_generators import generate_file_id
-        import os
+  
         import base64
-        import json
         import random
         
         canvas_id = task.canvas_id
@@ -164,7 +175,7 @@ class TaskQueueService:
                     # 处理图片路径
                     image_path = await self._prepare_image_path(image_info, canvas_id)
                     if not image_path:
-                        print(f"⚠️ 跳过第 {image_index + 1} 张图片：无法获取图片路径")
+                        logger.warning(f"⚠️ 跳过第 {image_index + 1} 张图片：无法获取图片路径")
                         continue
                     
                     # LLM分析
@@ -181,7 +192,7 @@ class TaskQueueService:
                     
                     # 验证图层数据
                     if not layers.get("layers") or len(layers["layers"]) == 0:
-                        print(f"⚠️ 第 {image_index + 1} 张图片没有检测到图层")
+                        logger.warning(f"⚠️ 第 {image_index + 1} 张图片没有检测到图层")
                         continue
                     
                     # 保存图层和抠图
@@ -193,7 +204,7 @@ class TaskQueueService:
                     
                     # 验证图层结果
                     if not layer_results or len(layer_results) == 0:
-                        print(f"⚠️ 第 {image_index + 1} 张图片的图层处理失败")
+                        logger.warning(f"⚠️ 第 {image_index + 1} 张图片的图层处理失败")
                         continue
                     
                     # 生成可视化
@@ -212,9 +223,9 @@ class TaskQueueService:
                     # 验证图层元素
                     if layer_elements:
                         all_layer_elements.extend(layer_elements)
-                        print(f"✅ 第 {image_index + 1} 张图片处理完成，生成了 {len(layer_elements)} 个图层")
+                        logger.info(f"✅ 第 {image_index + 1} 张图片处理完成，生成了 {len(layer_elements)} 个图层")
                     else:
-                        print(f"⚠️ 第 {image_index + 1} 张图片没有生成有效的图层元素")
+                        logger.warning(f"⚠️ 第 {image_index + 1} 张图片没有生成有效的图层元素")
                     
                     results.append({
                         "layers": layers,
@@ -225,8 +236,8 @@ class TaskQueueService:
                     })
                     
                 except Exception as e:
-                    print(f"❌ 处理第 {image_index + 1} 张图片失败: {e}")
-                    traceback.print_exc()
+                    logger.error(f"❌ 处理第 {image_index + 1} 张图片失败: {e}")
+                    logger.exception("图片处理详细错误信息:")
                     results.append({"error": str(e), "image_index": image_index})
             
             # 更新画布 - 在锁保护下进行
@@ -236,9 +247,9 @@ class TaskQueueService:
             
             if all_layer_elements:
                 await self._update_canvas_with_layers(canvas_id, all_layer_elements)
-                print(f"✅ 画布更新完成，添加了 {len(all_layer_elements)} 个图层")
+                logger.info(f"✅ 画布更新完成，添加了 {len(all_layer_elements)} 个图层")
             else:
-                print("⚠️ 没有图层需要添加到画布")
+                logger.warning("⚠️ 没有图层需要添加到画布")
         
         # 任务完成
         task.status = TaskStatus.COMPLETED
@@ -262,7 +273,7 @@ class TaskQueueService:
         base64_data = image_info.get('base64')
         
         if not file_id and not base64_data:
-            print("⚠️ 图片信息缺少fileId和base64数据")
+            logger.warning("⚠️ 图片信息缺少fileId和base64数据")
             return None
         
         from services.config_service import FILES_DIR
@@ -285,13 +296,13 @@ class TaskQueueService:
                         f.write(image_data)
                     
                     if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                        print(f"✅ 图片已保存到永久文件目录: {file_path}")
+                        logger.info(f"✅ 图片已保存到永久文件目录: {file_path}")
                         return file_path
                     else:
-                        print(f"❌ 文件创建失败: {file_path}")
+                        logger.error(f"❌ 文件创建失败: {file_path}")
                         return None
                 except Exception as e:
-                    print(f"❌ 处理base64数据失败: {e}")
+                    logger.error(f"❌ 处理base64数据失败: {e}")
                     return None
                     
             elif base64_data.startswith('/api/file/'):
@@ -300,30 +311,30 @@ class TaskQueueService:
                 if os.path.exists(image_path):
                     return image_path
                 else:
-                    print(f"❌ 文件不存在: {image_path}")
+                    logger.error(f"❌ 文件不存在: {image_path}")
                     return None
             else:
                 if os.path.exists(base64_data):
                     return base64_data
                 else:
-                    print(f"❌ 文件不存在: {base64_data}")
+                    logger.error(f"❌ 文件不存在: {base64_data}")
                     return None
         else:
             image_path = os.path.join(FILES_DIR, file_id)
             if os.path.exists(image_path):
                 return image_path
             else:
-                print(f"❌ 文件不存在: {image_path}")
+                logger.error(f"❌ 文件不存在: {image_path}")
                 return None
     
     async def _process_layer_elements(self, layer_results, background_path, image_info, canvas_id):
         """处理图层元素"""
-        import os
         import shutil
         import time
         import random
         from services.config_service import FILES_DIR
         from tools.image_generators import generate_file_id
+        from services.db_service import db_service
         
         layer_elements = []
         original_x = image_info.get('x', 0)
@@ -331,16 +342,92 @@ class TaskQueueService:
         original_width = image_info.get('width', 0)
         original_height = image_info.get('height', 0)
         
-        print(f"🔍 原始图片位置: x={original_x}, y={original_y}, width={original_width}, height={original_height}")
+        logger.debug(f"🔍 原始图片位置: x={original_x}, y={original_y}, width={original_width}, height={original_height}")
+        
+        # 获取画布上现有的元素，用于检查位置冲突
+        existing_elements = []
+        try:
+            canvas_data = await db_service.get_canvas_data(canvas_id)
+            if canvas_data and 'data' in canvas_data and 'elements' in canvas_data['data']:
+                existing_elements = canvas_data['data']['elements']
+                logger.info(f"获取到画布现有元素 {len(existing_elements)} 个")
+        except Exception as e:
+            logger.warning(f"获取画布元素失败，将使用默认位置: {e}")
+        
+        # 辅助函数：检查位置是否与现有元素冲突
+        def check_position_conflict(x, y, width, height, padding=10):
+            for elem in existing_elements:
+                if elem.get('type') != 'image' or elem.get('isDeleted', False):
+                    continue
+                
+                elem_x = elem.get('x', 0)
+                elem_y = elem.get('y', 0)
+                elem_width = elem.get('width', 0)
+                elem_height = elem.get('height', 0)
+                
+                # 检查是否有重叠
+                if (x < elem_x + elem_width + padding and 
+                    x + width + padding > elem_x and 
+                    y < elem_y + elem_height + padding and 
+                    y + height + padding > elem_y):
+                    return True  # 有冲突
+            
+            return False  # 无冲突
+        
+        # 辅助函数：找到整个图层组的合适放置基准位置
+        def find_group_base_position(step=100):
+            # 首先尝试右侧位置
+            x = original_x + original_width + 50  # 默认间距50像素
+            y = original_y
+            
+            # 检查这个基准位置是否适合整个原图大小
+            if not check_position_conflict(x, y, original_width, original_height):
+                return x, y
+            
+            # 尝试下方位置
+            x = original_x
+            y = original_y + original_height + 50
+            if not check_position_conflict(x, y, original_width, original_height):
+                return x, y
+            
+            # 尝试右下方位置
+            x = original_x + original_width + 50
+            y = original_y + original_height + 50
+            if not check_position_conflict(x, y, original_width, original_height):
+                return x, y
+            
+            # 如果以上位置都有冲突，尝试在画布上找一个空闲位置
+            # 从原图右侧开始，向右逐步尝试
+            x = original_x + original_width + 50
+            y = original_y
+            
+            max_attempts = 10  # 最大尝试次数
+            for _ in range(max_attempts):
+                x += step
+                if not check_position_conflict(x, y, original_width, original_height):
+                    return x, y
+            
+            # 如果所有尝试都失败，返回一个默认位置，但增加较大偏移
+            return original_x + original_width + 200, original_y + 200
+        
+        # 为整个图层组找一个基准位置
+        group_base_x, group_base_y = find_group_base_position()
+        logger.info(f"🔍 找到图层组基准位置: x={group_base_x}, y={group_base_y}")
+        
+        # 计算从原始位置到新基准位置的偏移量
+        offset_x = group_base_x - original_x
+        offset_y = group_base_y - original_y
         
         # 处理背景图层
         if background_path and os.path.exists(background_path):
             try:
-                # 背景图层放在原图右侧，与原图保持相同高度
-                background_x = original_x + original_width + 50  # 原图右侧50像素间距
-                background_y = original_y
+                # 背景图层位置 - 使用与原图相同的位置加上偏移量
+                background_width = original_width
+                background_height = original_height
+                background_x = original_x + offset_x
+                background_y = original_y + offset_y
                 
-                print(f"🔍 背景图层位置: x={background_x}, y={background_y}")
+                logger.debug(f"🔍 背景图层位置: x={background_x}, y={background_y}")
                 
                 new_file_id = generate_file_id()
                 file_extension = os.path.splitext(background_path)[1]
@@ -350,7 +437,7 @@ class TaskQueueService:
                 # 复制文件并验证
                 shutil.copy2(background_path, new_file_path)
                 if not os.path.exists(new_file_path) or os.path.getsize(new_file_path) == 0:
-                    print(f"❌ 背景图层文件复制失败: {new_file_path}")
+                    logger.error(f"❌ 背景图层文件复制失败: {new_file_path}")
                     return layer_elements
                 
                 background_element = {
@@ -399,9 +486,9 @@ class TaskQueueService:
                     'content': 'background'
                 })
                 
-                print(f"✅ 背景图层处理完成: {new_filename}, 位置: ({background_x}, {background_y})")
+                logger.info(f"✅ 背景图层处理完成: {new_filename}, 位置: ({background_x}, {background_y})")
             except Exception as e:
-                print(f"❌ 处理背景图层失败: {e}")
+                logger.error(f"❌ 处理背景图层失败: {e}")
         
         # 处理普通图层
         for layer_idx, layer_data in enumerate(layer_results):
@@ -420,13 +507,21 @@ class TaskQueueService:
                 else:
                     rel_x1, rel_y1, rel_x2, rel_y2 = 0, 0, 1, 1
                 
-                # 图层放在原图右侧，与原图保持相同高度
-                layer_x = original_x + original_width + 50 + (rel_x1 * original_width)
-                layer_y = original_y + (rel_y1 * original_height)
+                # 计算图层尺寸
                 layer_width = (rel_x2 - rel_x1) * original_width
                 layer_height = (rel_y2 - rel_y1) * original_height
                 
-                print(f"🔍 图层 {layer_data.get('content', 'unknown')} 位置: x={layer_x}, y={layer_y}, width={layer_width}, height={layer_height}")
+                # 计算图层在原图中的绝对位置
+                abs_x1 = original_x + (rel_x1 * original_width)
+                abs_y1 = original_y + (rel_y1 * original_height)
+                
+                # 应用相同的偏移量，保持图层之间的相对位置关系
+                layer_x = abs_x1 + offset_x
+                layer_y = abs_y1 + offset_y
+                
+                logger.debug(f"图层原始位置: ({abs_x1}, {abs_y1}), 偏移后: ({layer_x}, {layer_y})")
+                
+                logger.debug(f"🔍 图层 {layer_data.get('content', 'unknown')} 位置: x={layer_x}, y={layer_y}, width={layer_width}, height={layer_height}")
                 
                 layer_file_path = None
                 if layer_data.get('cutout', {}).get('status') == 'success':
@@ -443,7 +538,7 @@ class TaskQueueService:
                     # 复制文件并验证
                     shutil.copy2(layer_file_path, new_file_path)
                     if not os.path.exists(new_file_path) or os.path.getsize(new_file_path) == 0:
-                        print(f"❌ 图层文件复制失败: {new_file_path}")
+                        logger.error(f"❌ 图层文件复制失败: {new_file_path}")
                         continue
                     
                     layer_element = {
@@ -492,12 +587,12 @@ class TaskQueueService:
                         'content': layer_data.get('content', 'unknown')
                     })
                     
-                    print(f"✅ 图层 {layer_data.get('content', 'unknown')} 处理完成: {new_filename}")
+                    logger.info(f"✅ 图层 {layer_data.get('content', 'unknown')} 处理完成: {new_filename}")
                 else:
-                    print(f"⚠️ 图层文件不存在: {layer_file_path}")
+                    logger.warning(f"⚠️ 图层文件不存在: {layer_file_path}")
                     
             except Exception as e:
-                print(f"❌ 处理图层 {layer_idx} 失败: {e}")
+                logger.error(f"❌ 处理图层 {layer_idx} 失败: {e}")
                 continue
         
         return layer_elements
@@ -531,17 +626,17 @@ class TaskQueueService:
         # 使用事务保存画布数据
         try:
             await db_service.save_canvas_data(canvas_id, json.dumps(canvas_data['data']))
-            print(f"✅ 画布数据保存成功，添加了 {len(layer_elements)} 个图层")
+            logger.info(f"✅ 画布数据保存成功，添加了 {len(layer_elements)} 个图层")
         except Exception as e:
-            print(f"❌ 保存画布数据失败: {e}")
+            logger.error(f"❌ 保存画布数据失败: {e}")
             raise Exception(f"保存画布数据失败: {e}")
         
         # 发送图层添加通知
-        print(f"🔍 开始发送图层添加通知，共 {len(layer_elements)} 个图层")
+        logger.info(f"🔍 开始发送图层添加通知，共 {len(layer_elements)} 个图层")
         
         # 检查文件是否存在
         from services.config_service import FILES_DIR
-        print(f"📁 文件存储目录: {FILES_DIR}")
+        logger.debug(f"📁 文件存储目录: {FILES_DIR}")
         
         for i, layer_info in enumerate(layer_elements):
             try:
@@ -551,76 +646,87 @@ class TaskQueueService:
                 file_name = file_url.split('/')[-1] if '/api/file/' in file_url else None
                 file_path = os.path.join(FILES_DIR, file_name) if file_name else None
                 
-                print(f"🔍 图层 {i+1} 文件信息:")
-                print(f"   - 元素ID: {file_id}")
-                print(f"   - 文件URL: {file_url}")
-                print(f"   - 文件名: {file_name}")
-                print(f"   - 文件路径: {file_path}")
+                logger.debug(f"🔍 图层 {i+1} 文件信息:")
+                logger.debug(f"   - 元素ID: {file_id}")
+                logger.debug(f"   - 文件URL: {file_url}")
+                logger.debug(f"   - 文件名: {file_name}")
+                logger.debug(f"   - 文件路径: {file_path}")
                 
                 if file_path and os.path.exists(file_path):
                     file_size = os.path.getsize(file_path)
-                    print(f"   - 文件存在: ✅ (大小: {file_size} 字节)")
+                    logger.debug(f"   - 文件存在: ✅ (大小: {file_size} 字节)")
                 else:
-                    print(f"   - 文件存在: ❌ (文件不存在或路径无效)")
+                    logger.warning(f"   - 文件存在: ❌ (文件不存在或路径无效)")
                 
                 # 检查元素位置和尺寸
                 element = layer_info['element']
-                print(f"   - 元素位置: x={element['x']}, y={element['y']}, width={element['width']}, height={element['height']}")
+                logger.debug(f"   - 元素位置: x={element['x']}, y={element['y']}, width={element['width']}, height={element['height']}")
                 
-                # 直接使用sio.emit发送session_update事件
-                await sio.emit('session_update', {
-                    'session_id': canvas_id,
+                # 使用canvas_notification事件发送图层添加通知
+                await sio.emit('canvas_notification', {
+                    'type': 'layer_added',
                     'canvas_id': canvas_id,
-                    'type': 'layer_added',  # 使用与前端枚举一致的字符串
+                    'session_id': canvas_id,
                     'element': layer_info['element'],
                     'file': layer_info['file'],
                     'content': layer_info['content']
                 })
                 
                 # 添加调试日志
-                print(f"✅ 图层 {i+1} 添加通知已发送: {layer_info['content']}, 元素ID: {layer_info['element']['id']}")
+                logger.info(f"✅ 图层 {i+1} 添加通知已发送: {layer_info['content']}, 元素ID: {layer_info['element']['id']}")
                 
             except Exception as e:
-                print(f"⚠️ 发送图层 {i+1} 添加通知失败: {e}")
-                traceback.print_exc()
+                logger.error(f"⚠️ 发送图层 {i+1} 添加通知失败: {e}")
+                logger.exception("图层添加通知发送详细错误信息:")
         
         # 发送任务完成通知
         try:
-            await sio.emit('canvas_notification', {
+            # 使用task_notification发送任务完成通知
+            await sio.emit('task_notification', {
                 "type": "split_layers_success",
                 "canvas_id": canvas_id,
+                "task_type": "split_layers",
+                "status": "completed",
                 "message": f"图层拆分完成，添加了 {len(layer_elements)} 个图层到画布",
                 "timestamp": asyncio.get_event_loop().time()
             })
-            print(f"✅ 任务完成通知已发送")
+            logger.info(f"✅ 任务完成通知已通过task_notification发送")
+            
+            # 额外发送一个视图调整事件，确保所有图层都在视图中可见
+            # 延迟发送，确保前端有时间处理图层添加事件
+            await asyncio.sleep(1)
+            await sio.emit('canvas_notification', {
+                "type": "adjust_view",
+                "canvas_id": canvas_id,
+                "timestamp": asyncio.get_event_loop().time()
+            })
+            logger.info(f"✅ 视图调整通知已发送")
         except Exception as e:
-            print(f"⚠️ 发送任务完成通知失败: {e}")
+            logger.error(f"⚠️ 发送任务完成通知失败: {e}")
     
     async def _send_task_update(self, task: AsyncTask, custom_message: str = None):
         """发送任务更新通知"""
-        from services.websocket_service import broadcast_session_update
+        from services.websocket_state import sio
         
         message = custom_message or task.progress.current_message
         
         try:
-            await broadcast_session_update(
-                session_id="layer_split",
-                canvas_id=task.canvas_id,
-                event={
-                    'type': 'task_progress',
-                    'task_id': task.task_id,
-                    'task_type': task.task_type,
-                    'status': task.status.value,
-                    'progress': {
-                        'current_step': task.progress.current_step,
-                        'total_steps': task.progress.total_steps,
-                        'percentage': task.progress.percentage,
-                        'message': message
-                    }
+            # 使用专门的 task_notification 事件发送任务进度更新
+            await sio.emit('task_notification', {
+                'task_id': task.task_id,
+                'task_type': task.task_type,
+                'canvas_id': task.canvas_id,
+                'status': task.status.value,
+                'progress': {
+                    'current_step': task.progress.current_step,
+                    'total_steps': task.progress.total_steps,
+                    'percentage': task.progress.percentage,
+                    'message': message
                 }
-            )
+            })
+            logger.info(f"📊 任务进度更新已通过 task_notification 发送: {task.task_id}, 进度: {task.progress.percentage:.1f}%")
         except Exception as e:
-            print(f"⚠️ 发送任务更新通知失败: {e}")
+            logger.error(f"⚠️ 发送任务更新通知失败: {e}")
     
     async def submit_task(self, task_type: str, canvas_id: str, data: Dict[str, Any]) -> str:
         """提交新任务"""
@@ -630,7 +736,7 @@ class TaskQueueService:
         self.tasks[task_id] = task
         await self.task_queue.put(task)
         
-        print(f"📝 任务已提交: {task_id} ({task_type})")
+        logger.info(f"📝 任务已提交: {task_id} ({task_type})")
         return task_id
     
     async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -664,7 +770,7 @@ class TaskQueueService:
             return False
         
         task.status = TaskStatus.CANCELLED
-        print(f"❌ 任务已取消: {task_id}")
+        logger.info(f"❌ 任务已取消: {task_id}")
         return True
     
     async def list_tasks(self, canvas_id: str = None) -> list:

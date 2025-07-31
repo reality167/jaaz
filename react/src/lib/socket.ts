@@ -87,6 +87,10 @@ export class SocketIOManager {
     this.socket.on('canvas_notification', (data) => {
       this.handleCanvasNotification(data)
     })
+    
+    this.socket.on('task_notification', (data) => {
+      this.handleTaskNotification(data)
+    })
 
     this.socket.on('pong', (data) => {
       console.log('🔗 Pong received:', data)
@@ -159,24 +163,55 @@ export class SocketIOManager {
     
     // 根据通知类型处理不同的消息
     switch (data.type) {
-      case 'split_layers_started':
-        eventBus.emit('Canvas::SplitLayersStarted', data)
+      case 'layer_added':
+        console.log('📊 Layer added event received via canvas_notification:', {
+          canvas_id: data.canvas_id,
+          content: data.content,
+          element_id: data.element?.id,
+          file_id: data.file?.id,
+          file_url: data.file?.dataURL
+        })
+        eventBus.emit('Socket::Session::LayerAdded', data)
         break
-      case 'split_layers_success':
-        eventBus.emit('Canvas::SplitLayersSuccess', data)
+      case 'adjust_view':
+        console.log('🔍 Adjust view event received:', data)
         eventBus.emit('Canvas::AdjustView', { canvas_id: data.canvas_id })
-        break
-      case 'split_layers_error':
-        eventBus.emit('Canvas::SplitLayersError', data)
-        break
-      case 'split_layers_cancelled':
-        eventBus.emit('Canvas::SplitLayersCancelled', data)
-        break
-      case 'task_progress':
-        eventBus.emit('Canvas::TaskProgress', data)
         break
       default:
         console.log('⚠️ Unknown canvas notification type:', data.type)
+    }
+  }
+  
+  private handleTaskNotification(data: any) {
+    console.log('📋 Task notification received:', data)
+    
+    // 根据通知类型处理不同的任务消息
+    if (data.type === 'split_layers_success') {
+      eventBus.emit('Canvas::SplitLayersSuccess', data)
+      eventBus.emit('Canvas::AdjustView', { canvas_id: data.canvas_id })
+    } else if (data.task_type === 'split_layers') {
+      switch (data.status) {
+        case 'pending':
+          eventBus.emit('Canvas::SplitLayersStarted', data)
+          break
+        case 'running':
+          eventBus.emit('Canvas::TaskProgress', data)
+          break
+        case 'completed':
+          eventBus.emit('Canvas::SplitLayersSuccess', data)
+          break
+        case 'failed':
+          eventBus.emit('Canvas::SplitLayersError', data)
+          break
+        case 'cancelled':
+          eventBus.emit('Canvas::SplitLayersCancelled', data)
+          break
+        default:
+          eventBus.emit('Canvas::TaskProgress', data)
+      }
+    } else {
+      // 其他类型的任务
+      eventBus.emit('Task::Notification', data)
     }
   }
 

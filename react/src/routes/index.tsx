@@ -26,8 +26,6 @@ function Home() {
   const { mutate: createCanvasMutation, isPending } = useMutation({
     mutationFn: createCanvas,
     onSuccess: (data) => {
-      // 移除设置 initCanvas 为 true 的代码
-      // 这样可以避免聊天区域的输入按钮一直显示加载状态
       navigate({
         to: '/canvas/$id',
         params: { id: data.id },

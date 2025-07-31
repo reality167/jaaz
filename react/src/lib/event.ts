@@ -17,6 +17,19 @@ export type TImagePreviewEvent = Array<{
   height: number
 }>
 
+// 分层操作的基础事件类型
+export type TCanvasSplitLayersBaseEvent = {
+  type: string
+  canvas_id: string
+  message: string
+  timestamp: number
+}
+
+// 带有任务ID的分层事件类型
+export type TCanvasSplitLayersTaskEvent = TCanvasSplitLayersBaseEvent & {
+  task_id: string
+}
+
 export type TEvents = {
   // ********** Socket events - Start **********
   'Socket::Session::Error': ISocket.SessionErrorEvent
@@ -30,37 +43,19 @@ export type TEvents = {
   'Socket::Session::ToolCallProgress': ISocket.SessionToolCallProgressEvent
   'Socket::Session::LayerAdded': ISocket.SessionLayerAddedEvent
   // ********** Socket events - End **********
+  
+  // ********** Task events - Start **********
+  'Task::Notification': any // 通用任务通知事件
+  // ********** Task events - End **********
 
   // ********** Canvas events - Start **********
   'Canvas::AddImagesToChat': TCanvasAddImagesToChatEvent
   'Canvas::ImagesToPreview': TImagePreviewEvent  // 添加图像预览事件
   'Canvas::SplitLayers': TCanvasAddImagesToChatEvent
-  'Canvas::SplitLayersStarted': {
-    type: string
-    canvas_id: string
-    task_id: string
-    message: string
-    timestamp: number
-  }
-  'Canvas::SplitLayersSuccess': {
-    type: string
-    canvas_id: string
-    message: string
-    timestamp: number
-  }
-  'Canvas::SplitLayersError': {
-    type: string
-    canvas_id: string
-    message: string
-    timestamp: number
-  }
-  'Canvas::SplitLayersCancelled': {
-    type: string
-    canvas_id: string
-    task_id: string
-    message: string
-    timestamp: number
-  }
+  'Canvas::SplitLayersStarted': TCanvasSplitLayersTaskEvent
+  'Canvas::SplitLayersSuccess': TCanvasSplitLayersBaseEvent
+  'Canvas::SplitLayersError': TCanvasSplitLayersBaseEvent
+  'Canvas::SplitLayersCancelled': TCanvasSplitLayersTaskEvent
   'Canvas::TaskProgress': {
     type: string
     canvas_id: string

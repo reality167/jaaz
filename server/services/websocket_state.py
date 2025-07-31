@@ -5,8 +5,8 @@ from typing import Dict
 sio = socketio.AsyncServer(
     cors_allowed_origins="*",
     async_mode='asgi',
-    ping_timeout=60,  # 增加到60秒，与前端配置一致
-    ping_interval=25  # 设置为25秒，与前端配置一致
+    ping_timeout=60, 
+    ping_interval=25 
 )
 
 active_connections: Dict[str, dict] = {}
